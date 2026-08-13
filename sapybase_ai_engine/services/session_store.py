@@ -410,8 +410,9 @@ async def maybe_summarize_session(
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
             from langchain_core.messages import HumanMessage as _HM
+            from core.config import AUX_MODEL
             _model = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash-lite",
+                model=AUX_MODEL,
                 google_api_key=gemini_key,
                 temperature=0,
             )

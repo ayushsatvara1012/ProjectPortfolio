@@ -306,11 +306,13 @@ export default function CustomizePage() {
                     onChange={e => updateSetting('aiModel', e.target.value)}
                     className={inputCls + ' appearance-none pr-10'}
                   >
+                    {/* Must stay in sync with VALID_MODELS in core/config.py.
+                        gemini-2.5-pro (404s since 2026-08) and gemini-3.1-pro-preview
+                        (never allowlisted) were removed — both silently fell back to
+                        the tier default while the dropdown claimed otherwise. */}
                     <option value="">Default (auto / tier-based)</option>
                     <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (max speed)</option>
                     <option value="gemini-2.5-flash">Gemini 2.5 Flash (balanced thinking)</option>
-                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (standard reasoning)</option>
-                    <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro (next-gen preview)</option>
                   </select>
                 </div>
               </Section>

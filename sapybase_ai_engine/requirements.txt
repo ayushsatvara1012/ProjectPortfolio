@@ -6,7 +6,10 @@ psycopg2-binary
 pydantic
 python-dotenv
 pgvector
-langchain-google-genai
+# Pinned: response content shape varies across versions (2.5 returns a string,
+# 3.x a list of blocks), so an unpinned rebuild could change what 22 .content
+# call sites receive without a code change. Verified against the live API 4.3.3.
+langchain-google-genai==4.3.3
 langchain-core
 langchain-community
 langchain-text-splitters

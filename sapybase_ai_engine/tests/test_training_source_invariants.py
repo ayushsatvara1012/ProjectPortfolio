@@ -96,3 +96,39 @@ class TestPdfFallbackDocument:
         assert len(docs) == 1
         assert "source" not in docs[0].metadata
         assert docs[0].metadata.get("extraction") == "failed"
+
+    @pytest.mark.asyncio
+    async def test_failed_extraction_is_detected_not_ingested(self, tmp_path):
+        """The marker existed for months and nothing read it, so a text-less PDF
+        was stored as the sentence 'Could not extract text from this PDF.' and
+        reported to the owner as a successful training."""
+        import main
+        from pypdf import PdfWriter
+
+        blank = tmp_path / "blank.pdf"
+        writer = PdfWriter()
+        writer.add_blank_page(width=200, height=200)
+        with open(blank, "wb") as fh:
+            writer.write(fh)
+
+        docs = await main.process_pdf_efficiently(str(blank))
+        assert main.pdf_extraction_failed(docs) is True
+
+    def test_a_real_pdf_page_is_not_treated_as_a_failure(self):
+        # The no-op case: a normal extraction must stay trainable. An over-broad
+        # guard here would reject every PDF on the platform.
+        import main
+
+        docs = [
+            Document(page_content="Acetone, 99.5% purity", metadata={"page": 1}),
+            Document(page_content="Packed in 200L drums", metadata={"page": 2}),
+        ]
+        assert main.pdf_extraction_failed(docs) is False
+
+    def test_a_partial_vision_extraction_still_counts_as_usable(self):
+        # Vision runs on 3 sample pages; if some text came back the source has
+        # real content and must not be thrown away for the pages that missed.
+        import main
+
+        docs = [Document(page_content="Recovered by OCR", metadata={"page": 1, "method": "vision"})]
+        assert main.pdf_extraction_failed(docs) is False
