@@ -2179,6 +2179,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // slot mini-form. Submitting the form fills {value} into the card's template
   // and sends it — driving the existing agent loop to the card's tool.
   const handleHubCardTap = (card: HubCard) => {
+    // A panel left open behind the Home screen would render over whatever this
+    // card opens next (a quote tap showing the spec panel), so every card tap
+    // starts from a clean chat body — the panel cases below reopen their own.
+    closePanels();
     // D10: a "*_picker" card only takes the deterministic-panel path while its
     // config-registry flag is on. With the flag off — which for COA means this bot
     // has no Drive folder — hubCardTarget returns "tool" and the card degrades to
@@ -2216,13 +2220,21 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setHubInput('');
   };
 
+  // Every surface that replaces the chat body. The sample form belongs here with
+  // the three pickers: it is gated the same way, so leaving it open behind Home
+  // or a session switch puts it in front of whatever the visitor opened next.
+  const closePanels = () => {
+    setSampleFormOpen(false);
+    setSdsPickerOpen(false);
+    setCoaPickerOpen(false);
+    setSpecPickerOpen(false);
+  };
+
   // Open the structured sample form (from a hub card or an agent {form} action),
   // optionally prefilled with the product/grade the visitor mentioned in chat.
   const openSampleForm = (prefill: Record<string, string>) => {
     setActiveHubCard(null);
-    setSdsPickerOpen(false);
-    setCoaPickerOpen(false);
-    setSpecPickerOpen(false);
+    closePanels();
     setHubView('chat');
     setSampleError(null);
     setSampleFormPrefill(prefill || {});
@@ -2300,9 +2312,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // exclusive with the sample form / mini-form panels.
   const openSdsPicker = () => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setCoaPickerOpen(false);   // H12 — only one panel ever replaces the chat body
-    setSpecPickerOpen(false);  // §10.2 — the fourth participant
+    closePanels();  // H12 / §10.2 — only one surface ever replaces the chat body
     setHubView('chat');
     setSdsQuery('');
     setSdsSearchResults(null);
@@ -2320,9 +2330,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // handling of a free-text {form} action).
   const openSdsPickerWithResult = (sds: SdsResult) => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setCoaPickerOpen(false);   // H12
-    setSpecPickerOpen(false);  // §10.2
+    closePanels();
     setHubView('chat');
     setSdsQuery(sds.product || '');
     setSdsSearchResults(null);
@@ -2381,9 +2389,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // visitor, not to the panel, so closing and reopening must not clear it.
   const openCoaPicker = () => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setSdsPickerOpen(false);
-    setSpecPickerOpen(false);  // §10.2
+    closePanels();
     setHubView('chat');
     setCoaQuery('');
     setCoaResult(null);
@@ -2403,9 +2409,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // passed it, which reads as the tail of a question in a text box.
   const openCoaPickerWithResult = (row: CoaRow) => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setSdsPickerOpen(false);
-    setSpecPickerOpen(false);  // §10.2
+    closePanels();
     setHubView('chat');
     setCoaQuery('');
     setCoaResult(row);
@@ -2420,9 +2424,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // ever replaces the chat body, and this is its fourth participant.
   const openSpecPicker = () => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setSdsPickerOpen(false);
-    setCoaPickerOpen(false);
+    closePanels();
     setHubView('chat');
     setSpecQuery('');
     setSpecRows([]);
@@ -2443,9 +2445,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // clean search term, where the COA tool's slot holds whatever the model passed it.
   const openSpecPickerWithResults = (event: SpecDocEvent) => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setSdsPickerOpen(false);
-    setCoaPickerOpen(false);
+    closePanels();
     setHubView('chat');
     setSpecQuery(event.query);
     setSpecRows(event.rows);
@@ -2671,6 +2671,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (hasHub) setHubView('home');
     setActiveHubCard(null);
     setReopenableHubCard(null);
+    closePanels();
     setClearCount(c => c + 1);
   };
 
@@ -2682,6 +2683,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (hasHub) setHubView('chat');
     setActiveHubCard(null);
     setReopenableHubCard(null);
+    closePanels();
     animatedMsgIndices.current.clear();
     // Reset per-conversation gates so the resumed thread doesn't inherit the prior
     // view's lead-capture / handoff state. The fresh greeting shows until rows load.
@@ -3265,7 +3267,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                   <div className="relative flex items-center gap-2 pl-1">
                     {hasHub && hubView === 'chat' && view === 'chat' && (
                       // Top-nav button → Home screen (only for vertical bots in chat view).
-                      <button onClick={() => { setActiveHubCard(null); setReopenableHubCard(null); setHubView('home'); }}
+                      <button onClick={() => { setActiveHubCard(null); setReopenableHubCard(null); closePanels(); setHubView('home'); }}
                         style={{ WebkitTapHighlightColor: 'transparent', outlineColor: THEME_COLOR }}
                         className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="Go to home" title="Go to home">
                         <MIcon name="home" className="text-[20px] leading-none text-slate-500 dark:text-slate-400" />
