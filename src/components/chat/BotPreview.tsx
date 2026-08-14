@@ -184,14 +184,12 @@ const BotPreview = ({ theme = 'light' }: BotPreviewProps) => {
         </div>
 
         {/* ── Branding Strip ── */}
-        {!hideBranding && (
-          <div className={`shrink-0 py-3 flex justify-center items-center border-t border-slate-100/10 ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
-            <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-              <Image src={BrandLogo} alt="Vaayu" width={20} height={13} className="opacity-60" />
-              Vaayu Intelligence
-            </span>
-          </div>
-        )}
+        <div className={`shrink-0 py-3 flex justify-center items-center border-t border-slate-100/10 ${isDark ? 'bg-slate-950/80' : 'bg-gray-50/80'}`}>
+          <span className={`flex items-center gap-1.5 text-[9px] font-sans font-bold uppercase tracking-[0.2em] ${isDark ? 'text-slate-500' : 'text-slate-400'} ${hideBranding ? 'invisible pointer-events-none select-none' : ''}`} aria-hidden={hideBranding}>
+            <Image src={BrandLogo} alt="Vaayu" width={20} height={13} className="opacity-60" />
+            Vaayu Intelligence
+          </span>
+        </div>
 
         {/* ── Input Area ── */}
         <div className="p-4 shrink-0 z-10 flex flex-col bg-transparent">
