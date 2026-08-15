@@ -97,8 +97,6 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
     let currentAngle = 0;
     let animFrameId: number | null = null;
 
-    const strokeRGB = '100, 116, 139';
-
     const draw = () => {
       const rect = canvas.getBoundingClientRect();
       const width = rect.width;
@@ -181,7 +179,7 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
 
         if (alpha <= 0.01) continue;
 
-        ctx.strokeStyle = `rgba(${strokeRGB}, ${alpha.toFixed(3)})`;
+        ctx.strokeStyle = 'transparent';
         ctx.lineWidth = Math.abs(u) % 6 === 0 || Math.floor(v) % 6 === 0 ? 1.3 : 0.85;
         ctx.stroke();
       }

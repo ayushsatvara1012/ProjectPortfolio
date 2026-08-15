@@ -27,7 +27,14 @@ const AntigravityBackground = dynamic(() => import('../../components/marketing/A
 type ServiceItem = { title: string; desc: string; price: string; href?: string };
 type ServiceGroup = { label: string; items: ServiceItem[] };
 type DropdownKey = 'product' | 'services';
-type NavLink = { name: string; href: string; id: string; dropdown?: boolean; dropdownType?: DropdownKey };
+type NavLink = {
+  name: string;
+  href: string;
+  id: string;
+  dropdown?: boolean;
+  dropdownType?: DropdownKey;
+  borderRadius?: string;
+};
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -309,12 +316,12 @@ export default function Navbar() {
   };
 
   const navLinks: NavLink[] = [
-    { name: 'Home', href: '/#home', id: 'home' },
-    { name: 'Vaayu', href: '/vaayu', id: 'product' },
-    { name: 'Services', href: '/services', id: 'services', dropdown: true, dropdownType: 'services' },
-    { name: 'Docs', href: '/docs', id: 'docs' },
-    { name: 'Blog', href: '/blog', id: 'blog' },
-    { name: 'About', href: '/about', id: 'about' },
+    { name: 'Home', href: '/#home', id: 'home', borderRadius: 'rounded-tl-[28px] rounded-bl-[28px] rounded-tr-[4px] rounded-br-[4px]' },
+    { name: 'Vaayu', href: '/vaayu', id: 'product', borderRadius: 'rounded-full' },
+    { name: 'Services', href: '/services', id: 'services', dropdown: true, dropdownType: 'services', borderRadius: 'rounded-tl-[24px] rounded-br-[24px] rounded-tr-none rounded-bl-none' },
+    { name: 'Docs', href: '/docs', id: 'docs', borderRadius: 'rounded-tl-[16px] rounded-tr-[30px] rounded-bl-[4px] rounded-br-[4px]' },
+    { name: 'Blog', href: '/blog', id: 'blog', borderRadius: 'rounded-tl-[30px] rounded-bl-[16px] rounded-tr-[4px] rounded-br-[4px]' },
+    { name: 'About', href: '/about', id: 'about', borderRadius: 'rounded-tr-[28px] rounded-br-[28px] rounded-tl-[4px] rounded-bl-[4px]' },
   ];
 
   const handleLinkClick = (e: React.MouseEvent, href: string) => {
@@ -350,30 +357,25 @@ export default function Navbar() {
   return (
     <>
       <header
-        className={`fixed z-50 pointer-events-none top-0 left-0 w-full overflow-hidden lg:w-[calc(100%-32px)] lg:max-w-[1400px] lg:left-1/2 lg:-translate-x-1/2 transition-[height] duration-500 ease-[var(--nav-ease)] ${
-          isOpen ? 'h-dvh lg:h-[80px]' : activeDropdown ? 'h-[80px] lg:h-[440px]' : 'h-[80px]'
-        }`}
+        className={`fixed z-50 pointer-events-none top-0 left-0 w-full overflow-hidden lg:w-[calc(100%-32px)] lg:max-w-[1400px] lg:left-1/2 lg:-translate-x-1/2 transition-[height] duration-500 ease-[var(--nav-ease)] ${isOpen ? 'h-dvh lg:h-[80px]' : activeDropdown ? 'h-[80px] lg:h-[440px]' : 'h-[80px]'
+          }`}
       >
         {/* Border layer (desktop only). Hidden on mobile so mobile navbar has no outer border stroke. */}
         <div
           aria-hidden
-          className={`nav-shell__layer absolute inset-0 pointer-events-none hidden lg:block transition-colors duration-500 ${
-            isDarkNav ? 'bg-white/15' : 'bg-slate-900/10'
-          } rounded-2xl lg:rounded-[28px] ${
-            mounted ? 'nav-shell__layer--animated' : ''
-          } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
+          className={`nav-shell__layer absolute inset-0 pointer-events-none hidden lg:block transition-colors duration-500 ${isDarkNav ? 'bg-white/15' : 'bg-slate-900/10'
+            } rounded-2xl lg:rounded-[28px] ${mounted ? 'nav-shell__layer--animated' : ''
+            } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
         />
 
         {/* Glass surface with rounded bottom corners on mobile. */}
         <div
           aria-hidden
-          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-px right-px bottom-px pointer-events-none backdrop-blur-xl saturate-150 rounded-2xl lg:rounded-[27px] border shadow-sm transition-colors duration-500 ${
-            isDarkNav
+          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-px right-px bottom-px pointer-events-none backdrop-blur-xl saturate-150 rounded-2xl lg:rounded-[27px] border shadow-sm transition-colors duration-500 ${isDarkNav
               ? 'bg-[#0B0F19]/80 border-white/10'
               : 'bg-white/75 border-slate-900/10'
-          } ${
-            mounted ? 'nav-shell__layer--animated' : ''
-          } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
+            } ${mounted ? 'nav-shell__layer--animated' : ''
+            } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
         />
 
         {/* Collapsed-pill control: marks where the nav is and scrolls back to the
@@ -383,13 +385,11 @@ export default function Navbar() {
           onClick={handleRevealClick}
           tabIndex={collapsed ? 0 : -1}
           aria-label="Back to top and show navigation"
-          className={`hidden lg:flex absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[30px] items-center justify-center cursor-pointer transition-[opacity,visibility] ease-[var(--nav-ease)] motion-reduce:transition-none ${
-            mounted ? '' : 'transition-none'
-          } ${
-            collapsed
+          className={`hidden lg:flex absolute top-0 left-1/2 -translate-x-1/2 w-[300px] h-[30px] items-center justify-center cursor-pointer transition-[opacity,visibility] ease-[var(--nav-ease)] motion-reduce:transition-none ${mounted ? '' : 'transition-none'
+            } ${collapsed
               ? 'opacity-100 visible pointer-events-auto duration-200 delay-[380ms]'
               : 'opacity-0 invisible pointer-events-none duration-[120ms]'
-          }`}
+            }`}
         >
           <ArrowDownIcon size={14} className={`transition-colors duration-300 ${isDarkNav ? 'text-slate-300' : 'text-slate-900'}`} />
         </button>
@@ -399,13 +399,11 @@ export default function Navbar() {
         <div
           onFocusCapture={() => setFocusWithin(true)}
           onBlurCapture={() => setFocusWithin(false)}
-          className={`relative w-full max-w-screen-2xl mx-auto h-[80px] flex items-center justify-between pointer-events-auto transition-[opacity,visibility,transform] ease-[var(--nav-ease)] motion-reduce:transition-none ${
-          mounted ? '' : 'transition-none'
-        } ${
-          collapsed
-            ? 'opacity-100 visible translate-y-0 duration-200 lg:opacity-0 lg:invisible lg:-translate-y-3'
-            : 'opacity-100 visible translate-y-0 duration-300 delay-[260ms]'
-        }`}>
+          className={`relative w-full max-w-screen-2xl mx-auto h-[80px] flex items-center justify-between pointer-events-auto transition-[opacity,visibility,transform] ease-[var(--nav-ease)] motion-reduce:transition-none ${mounted ? '' : 'transition-none'
+            } ${collapsed
+              ? 'opacity-100 visible translate-y-0 duration-200 lg:opacity-0 lg:invisible lg:-translate-y-3'
+              : 'opacity-100 visible translate-y-0 duration-300 delay-[260ms]'
+            }`}>
 
           {/* Cell 1: Logo */}
           <div className="px-6 h-full flex items-center shrink-0 min-w-fit">
@@ -415,173 +413,169 @@ export default function Navbar() {
           </div>
 
           {/* Cell 2: Desktop Navigation Links (md+) */}
-          <div ref={dropdownRef} className="hidden lg:flex flex-1 items-center justify-center gap-5 xl:gap-8 2xl:gap-10 px-4 xl:px-8 h-full">
-            {navLinks.map((link) => (
-              <div
-                key={`nav-desk-${link.id || link.name}`}
-                className="relative text-lg font-newsreader font-normal antialiased h-full flex items-center"
-                onMouseEnter={() => {
-                  if (link.dropdown && link.dropdownType) {
-                    handleMouseEnterDropdown(link.dropdownType);
-                  }
-                }}
-                onMouseLeave={() => {
-                  if (link.dropdown && link.dropdownType) {
-                    handleMouseLeaveDropdown();
-                  }
-                }}
-              >
-                {link.dropdown && link.dropdownType ? (() => {
-                  const cfg = dropdownConfig[link.dropdownType];
-                  const key = link.dropdownType;
-                  const isActive = activeDropdown === key;
-                  return (
-                  <>
-                  <button
-                    ref={(el) => { triggerRefs.current[key] = el; }}
-                    onClick={() => setActiveDropdown(isActive ? null : key)}
-                    onMouseEnter={() => handleMouseEnterDropdown(key)}
-                    onMouseLeave={handleMouseLeaveDropdown}
-                    aria-expanded={isActive}
-                    aria-haspopup="true"
-                    aria-controls={`nav-dropdown-${key}`}
-                    className={`text-lg font-newsreader font-normal antialiased transition-colors h-full flex items-center gap-1.5 group cursor-pointer ${
-                      isDarkNav
-                        ? 'text-slate-100 hover:text-white'
-                        : 'text-slate-900 hover:text-slate-700'
-                    }`}
-                  >
-                    {link.name}
-                    <ArrowDownIcon
-                      size={12}
-                      className={`transition-transform duration-200 ${
-                        isDarkNav
-                          ? 'text-slate-100 group-hover:text-white'
-                          : 'text-slate-900 group-hover:text-slate-700'
-                      } ${isActive ? 'rotate-180' : ''}`}
-                    />
-                  </button>
+          <div ref={dropdownRef} className="hidden lg:flex flex-1 items-center justify-center gap-1.5 xl:gap-2 px-2 h-full">
+            {navLinks.map((link) => {
+              const itemRadius = link.borderRadius || 'rounded-full';
+              return (
+                <div
+                  key={`nav-desk-${link.id || link.name}`}
+                  className="relative text-base xl:text-lg font-newsreader font-normal antialiased h-full flex items-center"
+                  onMouseEnter={() => {
+                    if (link.dropdown && link.dropdownType) {
+                      handleMouseEnterDropdown(link.dropdownType);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (link.dropdown && link.dropdownType) {
+                      handleMouseLeaveDropdown();
+                    }
+                  }}
+                >
+                  {link.dropdown && link.dropdownType ? (() => {
+                    const cfg = dropdownConfig[link.dropdownType];
+                    const key = link.dropdownType;
+                    const isActive = activeDropdown === key;
+                    return (
+                      <>
+                        <button
+                          ref={(el) => { triggerRefs.current[key] = el; }}
+                          onClick={() => setActiveDropdown(isActive ? null : key)}
+                          onMouseEnter={() => handleMouseEnterDropdown(key)}
+                          onMouseLeave={handleMouseLeaveDropdown}
+                          aria-expanded={isActive}
+                          aria-haspopup="true"
+                          aria-controls={`nav-dropdown-${key}`}
+                          className={`text-base xl:text-lg font-newsreader font-normal antialiased transition-all duration-200 flex items-center justify-center gap-1.5 group cursor-pointer px-6 xl:px-7 min-h-[56px] h-[56px] pt-[0.2em] border select-none ${itemRadius} ${isActive
+                              ? isDarkNav
+                                ? 'border-white/40 bg-white/15 text-white shadow-sm'
+                                : 'border-slate-900/40 bg-slate-900/15 text-slate-950 shadow-sm'
+                              : isDarkNav
+                                ? 'border-white/15 bg-white/[0.05] text-slate-100 hover:text-white hover:bg-white/10 hover:border-white/30'
+                                : 'border-slate-900/15 bg-slate-900/[0.04] text-slate-900 hover:text-slate-950 hover:bg-slate-900/[0.08] hover:border-slate-900/30'
+                            }`}
+                        >
+                          <span>{link.name}</span>
+                          <ArrowDownIcon
+                            size={12}
+                            className={`transition-transform duration-200 ${isDarkNav
+                                ? 'text-slate-100 group-hover:text-white'
+                                : 'text-slate-900 group-hover:text-slate-950'
+                              } ${isActive ? 'rotate-180' : ''}`}
+                          />
+                        </button>
 
-                    {/* Desktop Dropdown */}
-                    <div
-                      id={`nav-dropdown-${key}`}
-                      className={`absolute top-[80px] left-1/2 -translate-x-1/2 w-[760px] max-w-[calc(100vw-2rem)] border-t transition-all duration-300 ease-[var(--nav-ease)] motion-reduce:transition-none z-50 origin-top overflow-hidden ${
-                        isDarkNav ? 'border-slate-800/40' : 'border-slate-200/50'
-                      } ${
-                        isActive
-                          ? 'opacity-100 translate-y-0 scale-100 delay-150 ease-out pointer-events-auto'
-                          : 'opacity-0 -translate-y-2 scale-95 delay-0 duration-150 ease-in pointer-events-none'
-                      }`}
-                      onMouseEnter={() => handleMouseEnterDropdown(key)}
-                      onMouseLeave={handleMouseLeaveDropdown}
-                    >
-                      {/* Invisible hover bridge sealing top-[76px] to top-[80px] */}
-                      <div className="absolute -top-4 left-0 w-full h-4 bg-transparent pointer-events-auto" />
-                      <div className="flex p-8">
-                        {/* Left Content */}
-                        <div className="w-1/2 pr-12 flex flex-col items-start justify-between">
-                          <div>
-                            <h3 className={`text-2xl font-google font-medium leading-tight mb-6 tracking-tight transition-colors ${
-                              isDarkNav ? 'text-white' : 'text-slate-900'
-                            }`}>
-                              {cfg.heading}
-                            </h3>
-
-                            {/* Left visual: animated canvas (Product) or static gradient (Services) */}
-                            <div className="relative w-full h-48 overflow-hidden rounded-2xl">
-                              {cfg.animated ? (
-                                renderCanvas && isActive && !prefersReducedMotion && (
-                                  <AntigravityBackground
-                                    effectStyle="water_drop"
-                                    particleCount={100}
-                                    particleType="dot"
-                                    particleSize={0.07}
-                                    colorPalette={['#3730A3', '#4F46E5', '#3B82F6', '#1D4ED8']}
-                                    particleSeparation={0.6}
-                                    speed={1}
-                                    cameraPosition={[0, 0, 26]}
-                                    parallaxBaseY={0}
-                                    parallaxX={0}
-                                    parallaxY={0}
-                                    fog={null}
-                                    containerClassName="absolute inset-0 pointer-events-none"
-                                  />
-                                )
-                              ) : (
-                                <div className="absolute inset-0 flex items-center justify-center p-5">
-                                  <p className={`text-sm font-google leading-relaxed text-center transition-colors ${
-                                    isDarkNav ? 'text-slate-400' : 'text-slate-600'
+                        {/* Desktop Dropdown */}
+                        <div
+                          id={`nav-dropdown-${key}`}
+                          className={`absolute top-[80px] left-1/2 -translate-x-1/2 w-[760px] max-w-[calc(100vw-2rem)] border-t transition-all duration-300 ease-[var(--nav-ease)] motion-reduce:transition-none z-50 origin-top overflow-hidden ${isDarkNav ? 'border-slate-800/40' : 'border-slate-200/50'
+                            } ${isActive
+                              ? 'opacity-100 translate-y-0 scale-100 delay-150 ease-out pointer-events-auto'
+                              : 'opacity-0 -translate-y-2 scale-95 delay-0 duration-150 ease-in pointer-events-none'
+                            }`}
+                          onMouseEnter={() => handleMouseEnterDropdown(key)}
+                          onMouseLeave={handleMouseLeaveDropdown}
+                        >
+                          {/* Invisible hover bridge sealing top-[76px] to top-[80px]. Only
+                              live while open - otherwise this 760px strip sits under the
+                              neighbouring nav links and opens the panel from their hover. */}
+                          <div className={`absolute -top-4 left-0 w-full h-4 bg-transparent ${isActive ? 'pointer-events-auto' : 'pointer-events-none'}`} />
+                          <div className="flex p-8">
+                            {/* Left Content */}
+                            <div className="w-1/2 pr-12 flex flex-col items-start justify-between">
+                              <div>
+                                <h3 className={`text-2xl font-google font-medium leading-tight mb-6 tracking-tight transition-colors ${isDarkNav ? 'text-white' : 'text-slate-900'
                                   }`}>
-                                    {cfg.pitch}
-                                  </p>
+                                  {cfg.heading}
+                                </h3>
+
+                                {/* Left visual: animated canvas (Product) or static gradient (Services) */}
+                                <div className="relative w-full h-48 overflow-hidden rounded-2xl">
+                                  {cfg.animated ? (
+                                    renderCanvas && isActive && !prefersReducedMotion && (
+                                      <AntigravityBackground
+                                        effectStyle="water_drop"
+                                        particleCount={100}
+                                        particleType="dot"
+                                        particleSize={0.07}
+                                        colorPalette={['#3730A3', '#4F46E5', '#3B82F6', '#1D4ED8']}
+                                        particleSeparation={0.6}
+                                        speed={1}
+                                        cameraPosition={[0, 0, 26]}
+                                        parallaxBaseY={0}
+                                        parallaxX={0}
+                                        parallaxY={0}
+                                        fog={null}
+                                        containerClassName="absolute inset-0 pointer-events-none"
+                                      />
+                                    )
+                                  ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center p-5">
+                                      <p className={`text-sm font-google leading-relaxed text-center transition-colors ${isDarkNav ? 'text-slate-400' : 'text-slate-600'
+                                        }`}>
+                                        {cfg.pitch}
+                                      </p>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
+                              </div>
+                              <Link href={cfg.cta.href} onClick={() => setActiveDropdown(null)} className={`px-5 py-2.5 border text-sm font-google font-medium rounded-full transition-colors ${isDarkNav
+                                  ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-white'
+                                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200/50 text-slate-900'
+                                }`}>
+                                {cfg.cta.label}
+                              </Link>
+                            </div>
+
+                            {/* Right Content - Item List */}
+                            <div className={`w-1/2 flex flex-col divide-y ${isDarkNav ? 'divide-slate-800/70' : 'divide-slate-200/70'
+                              }`}>
+                              {cfg.items.map((service, idx) => {
+                                return (
+                                  <Link
+                                    key={`${link.dropdownType}-drop-${idx}`}
+                                    href={service.href ?? cfg.itemHref}
+                                    onClick={() => setActiveDropdown(null)}
+                                    className={`group/item flex items-center justify-between px-4 py-3 rounded-2xl transition-colors ${isDarkNav ? 'hover:bg-slate-900/50' : 'hover:bg-slate-50'
+                                      }`}
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-70 group-hover/item:opacity-100 transition-opacity" />
+                                      <span className={`text-[15px] font-google transition-colors ${isDarkNav
+                                          ? 'text-slate-300 group-hover/item:text-slate-100'
+                                          : 'text-slate-700 group-hover/item:text-slate-900'
+                                        }`}>
+                                        {service.title}
+                                      </span>
+                                    </div>
+                                    <span className={`material-symbols-outlined text-[16px] transition-all duration-300 ease-out group-hover/item:translate-x-0.5 group-hover/item:-translate-y-0.5 ${isDarkNav
+                                        ? 'text-slate-500 group-hover/item:text-blue-400'
+                                        : 'text-slate-400 group-hover/item:text-blue-600'
+                                      }`}>
+                                      arrow_outward
+                                    </span>
+                                  </Link>
+                                );
+                              })}
                             </div>
                           </div>
-                          <Link href={cfg.cta.href} onClick={() => setActiveDropdown(null)} className={`px-5 py-2.5 border text-sm font-google font-medium rounded-full transition-colors ${
-                            isDarkNav
-                              ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-white'
-                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200/50 text-slate-900'
-                          }`}>
-                            {cfg.cta.label}
-                          </Link>
                         </div>
-
-                        {/* Right Content - Item List */}
-                        <div className={`w-1/2 flex flex-col divide-y ${
-                          isDarkNav ? 'divide-slate-800/70' : 'divide-slate-200/70'
-                        }`}>
-                          {cfg.items.map((service, idx) => {
-                            return (
-                               <Link
-                                key={`${link.dropdownType}-drop-${idx}`}
-                                href={service.href ?? cfg.itemHref}
-                                onClick={() => setActiveDropdown(null)}
-                                className={`group/item flex items-center justify-between px-4 py-3 rounded-2xl transition-colors ${
-                                  isDarkNav ? 'hover:bg-slate-900/50' : 'hover:bg-slate-50'
-                                }`}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-70 group-hover/item:opacity-100 transition-opacity" />
-                                  <span className={`text-[15px] font-google transition-colors ${
-                                    isDarkNav
-                                      ? 'text-slate-300 group-hover/item:text-slate-100'
-                                      : 'text-slate-700 group-hover/item:text-slate-900'
-                                  }`}>
-                                    {service.title}
-                                  </span>
-                                </div>
-                                <span className={`material-symbols-outlined text-[16px] transition-all duration-300 ease-out group-hover/item:translate-x-0.5 group-hover/item:-translate-y-0.5 ${
-                                  isDarkNav
-                                    ? 'text-slate-500 group-hover/item:text-blue-400'
-                                    : 'text-slate-400 group-hover/item:text-blue-600'
-                                }`}>
-                                  arrow_outward
-                                </span>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                  );
-                })() : (
-                  <Link
-                    href={link.href}
-                    onClick={(e) => handleLinkClick(e, link.href)}
-                    className={`text-lg font-newsreader font-normal antialiased transition-colors py-2 relative group ${
-                      isDarkNav ? 'text-slate-100 hover:text-white' : 'text-slate-900 hover:text-slate-700'
-                    }`}
-                  >
-                    {link.name}
-                    <div className={`absolute -bottom-1 left-0 w-full h-px scale-x-0 group-hover:scale-x-100 transition-transform origin-left ${
-                      isDarkNav ? 'bg-slate-200' : 'bg-slate-900'
-                    }`} />
-                  </Link>
-                )}
-              </div>
-            ))}
+                      </>
+                    );
+                  })() : (
+                    <Link
+                      href={link.href}
+                      onClick={(e) => handleLinkClick(e, link.href)}
+                      className={`text-base xl:text-lg font-newsreader font-normal antialiased transition-all duration-200 px-6 xl:px-7 min-h-[56px] h-[56px] pt-[0.2em] border cursor-pointer select-none flex items-center justify-center ${itemRadius} ${isDarkNav
+                          ? 'border-white/15 bg-white/[0.05] text-slate-100 hover:text-white hover:bg-white/10 hover:border-white/30'
+                          : 'border-slate-900/15 bg-slate-900/[0.04] text-slate-900 hover:text-slate-950 hover:bg-slate-900/[0.08] hover:border-slate-900/30'
+                        }`}
+                    >
+                      <span>{link.name}</span>
+                    </Link>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {/* Cell 3: Auth & Account (Desktop md+) */}
@@ -589,10 +583,11 @@ export default function Navbar() {
             <Show when="signed-out">
               <div className="h-full flex items-center px-1 xl:px-4 transition-colors duration-500">
                 <SignInButton mode="redirect">
-                  <button className={`text-lg font-newsreader font-normal transition-colors px-4 py-3 cursor-pointer ${
-                    isDarkNav ? 'text-slate-100 hover:text-white' : 'text-slate-900 hover:text-slate-700'
-                  }`}>
-                    Login
+                  <button className={`text-base xl:text-lg font-newsreader font-normal transition-all duration-200 px-6 xl:px-7 min-h-[56px] h-[56px] pt-[0.2em] cursor-pointer border rounded-l-[28px] rounded-r-[20px] select-none flex items-center justify-center ${isDarkNav
+                      ? 'border-white/15 bg-white/[0.05] text-slate-100 hover:text-white hover:bg-white/10 hover:border-white/30'
+                      : 'border-slate-900/15 bg-slate-900/[0.04] text-slate-900 hover:text-slate-950 hover:bg-slate-900/[0.08] hover:border-slate-900/30'
+                    }`}>
+                    <span>Login</span>
                   </button>
                 </SignInButton>
               </div>
@@ -601,9 +596,8 @@ export default function Navbar() {
               <div className="h-full flex items-center px-3 lg:px-6 gap-6 transition-[background-color] duration-500 bg-transparent">
                 <Link
                   href="/dashboard"
-                  className={`text-base font-google font-normal transition-all ease-in-out duration-300 flex items-center gap-2 px-4 py-2 ${
-                    isDarkNav ? 'text-slate-100' : 'text-slate-900'
-                  } hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600`}
+                  className={`text-base font-google font-normal transition-all ease-in-out duration-300 flex items-center gap-2 px-4 py-2 ${isDarkNav ? 'text-slate-100' : 'text-slate-900'
+                    } hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600`}
                 >
                   <span className="material-symbols-outlined ">dashboard</span>
                 </Link>
@@ -637,11 +631,10 @@ export default function Navbar() {
             </Show>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className={`h-16 w-16 flex items-center justify-center rounded-none transition-colors bg-transparent ${
-                isDarkNav
+              className={`h-16 w-16 flex items-center justify-center rounded-none transition-colors bg-transparent ${isDarkNav
                   ? 'text-slate-100 active:bg-slate-900'
                   : 'text-slate-900 active:bg-slate-50'
-              }`}
+                }`}
               aria-label="Toggle Menu"
               aria-expanded={isOpen}
               aria-controls="mobile-nav-menu"
@@ -654,11 +647,10 @@ export default function Navbar() {
         {/* Mobile Navigation Menu - Integrated seamlessly into the expanded header glass shell */}
         <div
           id="mobile-nav-menu"
-          className={`absolute top-[80px] left-0 right-0 bottom-0 z-40 transition-all duration-300 ease-in-out lg:hidden flex flex-col pointer-events-auto bg-transparent overflow-hidden ${
-            isOpen
+          className={`absolute top-[80px] left-0 right-0 bottom-0 z-40 transition-all duration-300 ease-in-out lg:hidden flex flex-col pointer-events-auto bg-transparent overflow-hidden ${isOpen
               ? 'opacity-100 translate-y-0 delay-150 ease-out'
               : 'opacity-0 -translate-y-2 delay-0 duration-150 ease-in pointer-events-none'
-          }`}
+            }`}
           style={{ touchAction: 'pan-y' }}
         >
           {/* Scrollable Nav Items */}
@@ -670,101 +662,94 @@ export default function Navbar() {
                     const cfg = dropdownConfig[link.dropdownType];
                     const isOpenMob = activeMobileDropdown === link.dropdownType;
                     return (
-                    <div>
-                      {/* Dropdown toggle row */}
-                      <button
-                        onClick={() => setActiveMobileDropdown(isOpenMob ? null : link.dropdownType!)}
-                        aria-expanded={isOpenMob}
-                        aria-controls={`mob-dropdown-${link.dropdownType}`}
-                        className={`w-full px-8 py-6 flex items-center justify-between text-xl font-newsreader font-normal transition-colors ${
-                          isDarkNav
-                            ? 'text-slate-100 hover:bg-slate-900/50'
-                            : 'text-slate-800 hover:bg-slate-50/50'
-                        }`}
-                      >
-                        <span>{link.name}</span>
-                        <span
-                          className={`material-symbols-outlined text-[18px] opacity-40 transition-transform duration-300 ${isOpenMob ? 'rotate-180' : ''}`}
-                        >
-                          expand_more
-                        </span>
-                      </button>
-
-                      {/* Dropdown sub-items */}
-                      <div id={`mob-dropdown-${link.dropdownType}`} className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[var(--nav-ease)] motion-reduce:transition-none ${isOpenMob ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                      <div className="overflow-y-auto max-h-[50vh]" style={{ touchAction: 'pan-y' }}>
-                        <div className="px-6 pb-8 flex flex-col gap-1">
-
-                          {/* Header (mirrors desktop) */}
-                          <div className="px-2 py-4 mb-2">
-                            <h4 className={`text-xl font-google font-medium leading-tight mb-2 tracking-tight transition-colors ${
-                              isDarkNav ? 'text-white' : 'text-slate-900'
-                            }`}>
-                              {cfg.heading}
-                            </h4>
-                          </div>
-
-                          {cfg.items.map((service, idx) => {
-                            return (
-                              <Link
-                                key={`mob-${link.dropdownType}-${idx}`}
-                                href={service.href ?? cfg.itemHref}
-                                onClick={() => {
-                                  setIsOpen(false);
-                                  setActiveMobileDropdown(null);
-                                }}
-                                className={`group/item flex items-center justify-between px-4 py-4 rounded-2xl transition-all duration-300 ${
-                                  isDarkNav
-                                    ? 'bg-slate-900/30 hover:bg-slate-800/50'
-                                    : 'bg-slate-50/50 hover:bg-slate-100'
-                                }`}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-40 group-hover/item:opacity-80 transition-opacity" />
-                                  <div className="flex flex-col">
-                                    <span className={`text-[15px] font-google font-medium transition-colors ${
-                                      isDarkNav ? 'text-slate-200' : 'text-slate-700'
-                                    }`}>
-                                      {service.title}
-                                    </span>
-                                    <span className="text-xs font-google text-slate-500">
-                                      {service.price}
-                                    </span>
-                                  </div>
-                                </div>
-                                <span className={`material-symbols-outlined text-[16px] transition-colors ${
-                                  isDarkNav ? 'text-slate-600 group-hover/item:text-blue-400' : 'text-slate-300 group-hover/item:text-blue-600'
-                                }`}>
-                                  chevron_right
-                                </span>
-                              </Link>
-                            );
-                          })}
-
-                          <Link
-                            href={cfg.cta.href}
-                            onClick={() => setIsOpen(false)}
-                            className={`mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-full text-sm font-google font-medium transition-colors ${
-                              isDarkNav ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-900'
+                      <div>
+                        {/* Dropdown toggle row */}
+                        <button
+                          onClick={() => setActiveMobileDropdown(isOpenMob ? null : link.dropdownType!)}
+                          aria-expanded={isOpenMob}
+                          aria-controls={`mob-dropdown-${link.dropdownType}`}
+                          className={`w-full px-8 py-6 flex items-center justify-between text-xl font-newsreader font-normal transition-colors ${isDarkNav
+                              ? 'text-slate-100 hover:bg-slate-900/50'
+                              : 'text-slate-800 hover:bg-slate-50/50'
                             }`}
+                        >
+                          <span>{link.name}</span>
+                          <span
+                            className={`material-symbols-outlined text-[18px] opacity-40 transition-transform duration-300 ${isOpenMob ? 'rotate-180' : ''}`}
                           >
-                            {cfg.cta.label}
-                            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                          </Link>
+                            expand_more
+                          </span>
+                        </button>
+
+                        {/* Dropdown sub-items */}
+                        <div id={`mob-dropdown-${link.dropdownType}`} className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[var(--nav-ease)] motion-reduce:transition-none ${isOpenMob ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                          <div className="overflow-y-auto max-h-[50vh]" style={{ touchAction: 'pan-y' }}>
+                            <div className="px-6 pb-8 flex flex-col gap-1">
+
+                              {/* Header (mirrors desktop) */}
+                              <div className="px-2 py-4 mb-2">
+                                <h4 className={`text-xl font-google font-medium leading-tight mb-2 tracking-tight transition-colors ${isDarkNav ? 'text-white' : 'text-slate-900'
+                                  }`}>
+                                  {cfg.heading}
+                                </h4>
+                              </div>
+
+                              {cfg.items.map((service, idx) => {
+                                return (
+                                  <Link
+                                    key={`mob-${link.dropdownType}-${idx}`}
+                                    href={service.href ?? cfg.itemHref}
+                                    onClick={() => {
+                                      setIsOpen(false);
+                                      setActiveMobileDropdown(null);
+                                    }}
+                                    className={`group/item flex items-center justify-between px-4 py-4 rounded-2xl transition-all duration-300 ${isDarkNav
+                                        ? 'bg-slate-900/30 hover:bg-slate-800/50'
+                                        : 'bg-slate-50/50 hover:bg-slate-100'
+                                      }`}
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-40 group-hover/item:opacity-80 transition-opacity" />
+                                      <div className="flex flex-col">
+                                        <span className={`text-[15px] font-google font-medium transition-colors ${isDarkNav ? 'text-slate-200' : 'text-slate-700'
+                                          }`}>
+                                          {service.title}
+                                        </span>
+                                        <span className="text-xs font-google text-slate-500">
+                                          {service.price}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <span className={`material-symbols-outlined text-[16px] transition-colors ${isDarkNav ? 'text-slate-600 group-hover/item:text-blue-400' : 'text-slate-300 group-hover/item:text-blue-600'
+                                      }`}>
+                                      chevron_right
+                                    </span>
+                                  </Link>
+                                );
+                              })}
+
+                              <Link
+                                href={cfg.cta.href}
+                                onClick={() => setIsOpen(false)}
+                                className={`mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-full text-sm font-google font-medium transition-colors ${isDarkNav ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-900'
+                                  }`}
+                              >
+                                {cfg.cta.label}
+                                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                              </Link>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      </div>
-                    </div>
                     );
                   })() : (
                     <Link
                       href={link.href}
                       onClick={(e) => handleLinkClick(e, link.href)}
-                      className={`w-full px-8 py-6 flex items-center justify-between text-xl font-newsreader font-normal transition-colors ${
-                        isDarkNav
+                      className={`w-full px-8 py-6 flex items-center justify-between text-xl font-newsreader font-normal transition-colors ${isDarkNav
                           ? 'text-slate-100 hover:bg-slate-900/50'
                           : 'text-slate-800 hover:bg-slate-50/50'
-                      }`}
+                        }`}
                     >
                       <span>{link.name}</span>
                       <span className="material-symbols-outlined text-[18px] opacity-40">chevron_right</span>
@@ -803,7 +788,7 @@ export default function Navbar() {
                 onClick={() => setIsOpen(false)}
                 className="w-full bg-slate-900 dark:bg-blue-600 text-white py-3 text-sm font-google  font-medium hover:bg-slate-800 dark:hover:bg-blue-500 transition-all rounded-full flex items-center justify-center gap-2 tracking-wider"
               >
-               <span className='material-symbols-outlined text-sm text-white'>dashboard</span> Dashboard
+                <span className='material-symbols-outlined text-sm text-white'>dashboard</span> Dashboard
               </Link>
             </Show>
           </div>
