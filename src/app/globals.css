@@ -396,67 +396,14 @@
 
      Sky travels toward cyan rather than the other way; going the other
      direction lands in indigo. */
-  @keyframes spiralPalette {
-    0%,       30.833%  { --spiral-s0: #c0392b; --spiral-s1: #e07a2e; --spiral-s2: #e8b93a; }
-    33.333%,  64.167%  { --spiral-s0: #0f3f6b; --spiral-s1: #1587a8; --spiral-s2: #64d8d0; }
-    66.667%,  97.5%    { --spiral-s0: #12442f; --spiral-s1: #339950; --spiral-s2: #64c95e; }
-    100%               { --spiral-s0: #c0392b; --spiral-s1: #e07a2e; --spiral-s2: #e8b93a; }
+  .spiral {
+    --spiral-s0: #cbd5e1;
+    --spiral-s1: #f8fafc;
+    --spiral-s2: #ffffff;
   }
 
-  /* Dark anchors are tuned against #0B0F19 rather than lightened from the
-     light set — they have to sit far enough above the page base to stay
-     legible at the wrapper's reduced dark-mode opacity. They hold the same
-     hue sweep as the light set above; only lightness and chroma differ. */
-  @keyframes spiralPaletteDark {
-    0%,       30.833%  { --spiral-s0: #e2574a; --spiral-s1: #f0954a; --spiral-s2: #f2ce5c; }
-    33.333%,  64.167%  { --spiral-s0: #2a72b0; --spiral-s1: #2fa8cc; --spiral-s2: #96e8e0; }
-    66.667%,  97.5%    { --spiral-s0: #2d8f63; --spiral-s1: #40bf66; --spiral-s2: #8fdd88; }
-    100%               { --spiral-s0: #e2574a; --spiral-s1: #f0954a; --spiral-s2: #f2ce5c; }
-  }
-
-  /* `linear`: the three anchors are evenly spaced and carry their own holds,
-     so an eased curve would only stall and lurch on top of that — and worse,
-     would desynchronise the leaves, since each sits at a different point of
-     the curve and would travel at a different rate.
-
-     The fallback `0s` is not dead code: it keeps a leaf sane if the component
-     ever renders without its inline delay. */
   .spiral path {
-    animation: spiralPalette 60s linear infinite;
-    animation-delay: var(--leaf-delay, 0s);
-  }
-
-  /* Same convention as the mesh blobs below: light is the base and
-     `prefers-color-scheme: dark` overrides, because this project has no theme
-     provider and no `dark` class, so Tailwind's `dark:` variant — which
-     HeroSpiral's wrapper uses for its opacity — resolves to the media query. */
-  @media (prefers-color-scheme: dark) {
-    .spiral path {
-      animation-name: spiralPaletteDark;
-    }
-  }
-
-  /* Freeze on fire, the palette the cycle opens on. Set on the wrapper rather
-     than the leaves: with the leaves' animation off, nothing writes the
-     `--spiral-s*` properties any more, so the leaves inherit these instead.
-     The form stays fully drawn — removing the motion must not remove the
-     artwork. */
-  @media (prefers-reduced-motion: reduce) {
-    .spiral path {
-      animation: none;
-    }
-    .spiral {
-      --spiral-s0: #c0392b;
-      --spiral-s1: #e07a2e;
-      --spiral-s2: #e8b93a;
-    }
-  }
-  @media (prefers-reduced-motion: reduce) and (prefers-color-scheme: dark) {
-    .spiral {
-      --spiral-s0: #e2574a;
-      --spiral-s1: #f0954a;
-      --spiral-s2: #f2ce5c;
-    }
+    animation: none;
   }
 
   /* ── Hero horizon field ────────────────────────────────────────────────

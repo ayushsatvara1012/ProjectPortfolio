@@ -22,7 +22,8 @@
    `image 1.svg` wash at 0.40 over each theme's page colour, not in general. */
 export const HERO_BUTTON =
   'flex items-center justify-center text-center whitespace-nowrap px-5 pt-3.5 pb-2.5 text-base sm:px-8 sm:pt-[18px] sm:pb-[14px] sm:text-lg font-newsreader ' +
-  'bg-white/55 dark:bg-white/20 backdrop-blur-md shadow-sm ' +
-  'border border-slate-900/50 dark:border-white/45 ' +
-  'text-slate-900 dark:text-slate-100 ' +
-  'hover:bg-white/75 dark:hover:bg-white/30 hover:border-slate-900/65 dark:hover:border-white/60 transition-all';
+  'bg-white/10 backdrop-blur-xl shadow-lg shadow-black/20 ' +
+  'border-none ' +
+  'text-slate-100 ' +
+  'hover:bg-white/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200';
+

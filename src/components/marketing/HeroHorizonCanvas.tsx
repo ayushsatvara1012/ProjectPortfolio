@@ -34,6 +34,9 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
     const V_MAX = 30;
     const V_STEP = 1.2;
 
+    const U_CENTER = 0;
+    const V_CENTER = 15;
+
     const depthAt = (u: number, v: number) => v + Z_OFF;
 
     function terrainHeight(u: number, v: number): number {
@@ -59,109 +62,177 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
       return 0;
     }
 
-    function project(u: number, v: number, h: number = 0): [number, number, number] {
-      const d = depthAt(u, v);
-      const px = CX + (FOCAL * u) / d;
+    function projectRotated(u: number, v: number, h: number = 0, angle: number = 0): [number, number, number] {
+      if (Math.abs(angle) < 0.0001) {
+        const d = depthAt(u, v);
+        const px = CX + (FOCAL * u) / d;
+        const py = HORIZON + (FOCAL * (CAM_H - h)) / d;
+        return [px, py, d];
+      }
+
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
+
+      const uOffset = u - U_CENTER;
+      const vOffset = v - V_CENTER;
+
+      // Y-axis 3D rotation: positive angle recedes left terrain into depth, brings right terrain forward
+      const uRot = uOffset * cosA + vOffset * sinA + U_CENTER;
+      const vRot = -uOffset * sinA + vOffset * cosA + V_CENTER;
+
+      const d = depthAt(uRot, Math.max(0.1, vRot));
+      const px = CX + (FOCAL * uRot) / d;
       const py = HORIZON + (FOCAL * (CAM_H - h)) / d;
       return [px, py, d];
     }
 
-    // Sky region is everything above HORIZON, i.e. exactly where the grid
-    // has ended - stars only need to live there.
+    // Sky region is everything above HORIZON, i.e. exactly where the grid ended
     const SKY = generateGalaxySky(1337, W, HORIZON, 220);
 
-    // No theme provider and no `dark` class in this project - `dark:` resolves
-    // to the media query, so the canvas has to read it the same way.
     const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // Scroll progress & smooth lerping state
+    let targetAngle = 0;
+    let currentAngle = 0;
+    let animFrameId: number | null = null;
+
+    const strokeRGB = '100, 116, 139';
 
     const draw = () => {
       const rect = canvas.getBoundingClientRect();
       const width = rect.width;
       const height = rect.height;
 
+      if (width === 0 || height === 0) return;
+
       ctx.clearRect(0, 0, width, height);
 
       const scaleX = width / W;
       const scaleY = height / H;
 
-      const isDarkMode = darkQuery.matches;
-
-      // Near-neutral on dark so the warm gradient tints the lines itself rather
-      // than a saturated accent competing with it.
-      const strokeRGB = isDarkMode ? '100, 116, 139' : '30, 64, 175';
-
       ctx.save();
       ctx.scale(scaleX, scaleY);
 
-      // --- 0. GALAXY SKY: nebula wash + starfield, dark mode only. Drawn
-      // before the terrain so the facet erase-pass below naturally occludes
-      // stars sitting behind the mountain silhouette. ---
-      if (isDarkMode) {
-        drawGalaxySky(ctx, SKY, HORIZON);
-      }
+      // 0. GALAXY SKY: nebula wash + starfield (Static, unaffected by rotation)
+      drawGalaxySky(ctx, SKY, HORIZON);
 
-      // --- 1. PAINTER'S ALGORITHM: NAVBAR-MATCHED FROSTED GLASS FACETS ---
+      // 1. PAINTER'S ALGORITHM FACET RENDERING WITH DYNAMIC Y-AXIS 3D ROTATION
+      const cosA = Math.cos(currentAngle);
+      const sinA = Math.sin(currentAngle);
+
+      type Facet = { u: number; v: number; avgVRot: number };
+      const facets: Facet[] = [];
+
       for (let v = V_MAX; v >= V_MIN; v -= V_STEP) {
         for (let u = U_MIN; u < U_MAX; u += U_STEP) {
-          const uNext = u + U_STEP;
-          const vNext = v - V_STEP;
-
-          const h00 = terrainHeight(u, v);
-          const h10 = terrainHeight(uNext, v);
-          const h11 = terrainHeight(uNext, vNext);
-          const h01 = terrainHeight(u, vNext);
-
-          const [p00x, p00y, d00] = project(u, v, h00);
-          const [p10x, p10y] = project(uNext, v, h10);
-          const [p11x, p11y] = project(uNext, vNext, h11);
-          const [p01x, p01y] = project(u, vNext, h01);
-
-          const midX = (p00x + p10x + p11x + p01x) / 4;
-          const midY = (p00y + p10y + p11y + p01y) / 4;
-          const distToText = Math.hypot(midX - CX, midY - 420);
-          const textClearance = Math.min(1, Math.max(0, (distToText - 180) / 220));
-
-          const depthAlpha = Math.min(0.45, Math.max(0.05, (32 - d00) / 28));
-          const alpha = depthAlpha * (0.2 + 0.8 * textClearance);
-
-          ctx.beginPath();
-          ctx.moveTo(p00x, p00y);
-          ctx.lineTo(p10x, p10y);
-          ctx.lineTo(p11x, p11y);
-          ctx.lineTo(p01x, p01y);
-          ctx.closePath();
-
-          // Every facet is opaque to whatever sits behind it: erase first, then lay
-          // down the translucent glass so only the page gradient shows through.
-          ctx.globalCompositeOperation = 'destination-out';
-          ctx.fillStyle = '#000';
-          ctx.fill();
-          ctx.globalCompositeOperation = 'source-over';
-
-          const avgH = (h00 + h10 + h11 + h01) / 4;
-          const elevationShade = Math.min(1, avgH / 5);
-          const glassAlpha = Math.min(0.82, 0.42 + (28 - d00) / 60 + elevationShade * 0.18);
-
-          if (isDarkMode) {
-            // Navbar's glass: #0B0F19 at 0.70 over backdrop-blur-xl. Depth scales
-            // it down so far facets sink into the gradient instead of slabbing it.
-            const darkAlpha = Math.min(0.7, 0.28 + (28 - d00) / 70 + elevationShade * 0.12);
-            ctx.fillStyle = `rgba(11, 15, 25, ${darkAlpha.toFixed(3)})`;
-          } else {
-            const shade = Math.round(elevationShade * 26);
-            ctx.fillStyle = `rgba(${255 - shade}, ${255 - shade}, ${255 - Math.round(shade * 0.6)}, ${glassAlpha.toFixed(3)})`;
-          }
-          ctx.fill();
-
-          if (alpha <= 0.01) continue;
-
-          ctx.strokeStyle = `rgba(${strokeRGB}, ${alpha.toFixed(3)})`;
-          ctx.lineWidth = Math.abs(u) % 6 === 0 || Math.floor(v) % 6 === 0 ? 1.3 : 0.85;
-          ctx.stroke();
+          const uCenter = u + U_STEP * 0.5 - U_CENTER;
+          const vCenter = v - V_STEP * 0.5 - V_CENTER;
+          const avgVRot = -uCenter * sinA + vCenter * cosA + V_CENTER;
+          facets.push({ u, v, avgVRot });
         }
       }
 
+      // Sort farthest facets to nearest (largest avgVRot first)
+      facets.sort((a, b) => b.avgVRot - a.avgVRot);
+
+      for (const facet of facets) {
+        const u = facet.u;
+        const v = facet.v;
+        const uNext = u + U_STEP;
+        const vNext = v - V_STEP;
+
+        const h00 = terrainHeight(u, v);
+        const h10 = terrainHeight(uNext, v);
+        const h11 = terrainHeight(uNext, vNext);
+        const h01 = terrainHeight(u, vNext);
+
+        const [p00x, p00y, d00] = projectRotated(u, v, h00, currentAngle);
+        const [p10x, p10y] = projectRotated(uNext, v, h10, currentAngle);
+        const [p11x, p11y] = projectRotated(uNext, vNext, h11, currentAngle);
+        const [p01x, p01y] = projectRotated(u, vNext, h01, currentAngle);
+
+        const midX = (p00x + p10x + p11x + p01x) / 4;
+        const midY = (p00y + p10y + p11y + p01y) / 4;
+        const distToText = Math.hypot(midX - CX, midY - 420);
+        const textClearance = Math.min(1, Math.max(0, (distToText - 180) / 220));
+
+        const depthAlpha = Math.min(0.45, Math.max(0.05, (32 - d00) / 28));
+        const alpha = depthAlpha * (0.2 + 0.8 * textClearance);
+
+        ctx.beginPath();
+        ctx.moveTo(p00x, p00y);
+        ctx.lineTo(p10x, p10y);
+        ctx.lineTo(p11x, p11y);
+        ctx.lineTo(p01x, p01y);
+        ctx.closePath();
+
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = '#000';
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+
+        const avgH = (h00 + h10 + h11 + h01) / 4;
+        const elevationShade = Math.min(1, avgH / 5);
+
+        const darkAlpha = Math.min(0.7, 0.28 + (28 - d00) / 70 + elevationShade * 0.12);
+        ctx.fillStyle = `rgba(11, 15, 25, ${darkAlpha.toFixed(3)})`;
+        ctx.fill();
+
+        if (alpha <= 0.01) continue;
+
+        ctx.strokeStyle = `rgba(${strokeRGB}, ${alpha.toFixed(3)})`;
+        ctx.lineWidth = Math.abs(u) % 6 === 0 || Math.floor(v) % 6 === 0 ? 1.3 : 0.85;
+        ctx.stroke();
+      }
+
       ctx.restore();
+    };
+
+    const updateScrollProgress = () => {
+      if (reducedMotionQuery.matches) {
+        targetAngle = 0;
+        return;
+      }
+
+      const homeEl = document.getElementById('home');
+      const chatbotsEl = document.getElementById('chatbots');
+
+      if (!homeEl || !chatbotsEl) {
+        targetAngle = 0;
+        return;
+      }
+
+      const chatbotsRect = chatbotsEl.getBoundingClientRect();
+      const vh = window.innerHeight;
+
+      // Target completion: ChatbotShowcase is 80% visible (top is at vh * 0.20)
+      const currentScrollY = window.scrollY;
+      const targetScrollY = chatbotsRect.top + currentScrollY - (vh * 0.20);
+
+      if (targetScrollY <= 0) {
+        targetAngle = 0;
+      } else {
+        const rawProgress = currentScrollY / targetScrollY;
+        const progress = Math.min(1, Math.max(0, rawProgress));
+        // Max rotation angle theta = 0.42 radians (~24 degrees)
+        const MAX_ROTATION_RAD = 0.42;
+        targetAngle = progress * MAX_ROTATION_RAD;
+      }
+    };
+
+    const renderLoop = () => {
+      updateScrollProgress();
+      // Smooth lerp (0.08) for butter-smooth animation
+      const diff = targetAngle - currentAngle;
+      if (Math.abs(diff) > 0.0001) {
+        currentAngle += diff * 0.08;
+        draw();
+      } else if (currentAngle !== targetAngle) {
+        currentAngle = targetAngle;
+        draw();
+      }
+      animFrameId = requestAnimationFrame(renderLoop);
     };
 
     const handleResize = () => {
@@ -174,11 +245,16 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
     };
 
     handleResize();
+    renderLoop();
+
     window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', updateScrollProgress, { passive: true });
     darkQuery.addEventListener('change', draw);
 
     return () => {
+      if (animFrameId !== null) cancelAnimationFrame(animFrameId);
       window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', updateScrollProgress);
       darkQuery.removeEventListener('change', draw);
     };
   }, []);
@@ -191,3 +267,4 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
     />
   );
 }
+

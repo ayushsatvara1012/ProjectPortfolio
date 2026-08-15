@@ -38,13 +38,72 @@ export default function Navbar() {
   const [focusWithin, setFocusWithin] = useState(false);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
   const [forceExpanded, setForceExpanded] = useState(false);
-  // Gates the clip-path transition so the first painted frame lands on the
-  // correct shape instead of animating into it after hydration.
   const [mounted, setMounted] = useState(false);
+  const [isDarkSection, setIsDarkSection] = useState(true);
+  const [isSystemDark, setIsSystemDark] = useState(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const triggerRefs = useRef<Partial<Record<DropdownKey, HTMLButtonElement | null>>>({});
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
+
+  useEffect(() => {
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsSystemDark(mql.matches);
+    const handler = (e: MediaQueryListEvent) => setIsSystemDark(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+
+  useEffect(() => {
+    const checkSectionTheme = () => {
+      const checkY = 85;
+      const checkX = Math.min(window.innerWidth / 2, 400);
+      const element = document.elementFromPoint(checkX, checkY);
+      if (!element) return;
+
+      const heroEl = element.closest('#home');
+      if (heroEl || window.scrollY < 300) {
+        setIsDarkSection(true);
+        return;
+      }
+
+      const section = element.closest('section, main, header, div[id]');
+      if (section) {
+        const isDarkBgClass =
+          section.classList.contains('bg-slate-950') ||
+          section.classList.contains('bg-[#0B0F19]') ||
+          section.classList.contains('bg-black') ||
+          section.getAttribute('data-theme') === 'dark';
+
+        if (isDarkBgClass) {
+          setIsDarkSection(true);
+          return;
+        }
+
+        const bg = window.getComputedStyle(section).backgroundColor;
+        const rgb = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (rgb) {
+          const [, r, g, b] = rgb.map(Number);
+          if (r + g + b < 250 && bg !== 'rgba(0, 0, 0, 0)') {
+            setIsDarkSection(true);
+            return;
+          }
+        }
+      }
+
+      setIsDarkSection(false);
+    };
+
+    checkSectionTheme();
+    window.addEventListener('scroll', checkSectionTheme, { passive: true });
+    window.addEventListener('resize', checkSectionTheme, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', checkSectionTheme);
+      window.removeEventListener('resize', checkSectionTheme);
+    };
+  }, []);
+
+  const isDarkNav = isSystemDark || isDarkSection;
 
   const handleMouseEnterDropdown = (key: DropdownKey) => {
     if (dropdownTimeoutRef.current) {
@@ -298,7 +357,9 @@ export default function Navbar() {
         {/* Border layer (desktop only). Hidden on mobile so mobile navbar has no outer border stroke. */}
         <div
           aria-hidden
-          className={`nav-shell__layer absolute inset-0 pointer-events-none hidden lg:block bg-slate-900/10 dark:bg-white/15 rounded-2xl lg:rounded-[28px] ${
+          className={`nav-shell__layer absolute inset-0 pointer-events-none hidden lg:block transition-colors duration-500 ${
+            isDarkNav ? 'bg-white/15' : 'bg-slate-900/10'
+          } rounded-2xl lg:rounded-[28px] ${
             mounted ? 'nav-shell__layer--animated' : ''
           } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
         />
@@ -306,10 +367,10 @@ export default function Navbar() {
         {/* Glass surface with rounded bottom corners on mobile. */}
         <div
           aria-hidden
-          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-px right-px bottom-px pointer-events-none backdrop-blur-xl saturate-150 rounded-2xl lg:rounded-[27px] border border-white/20 dark:border-white/10 shadow-sm ${
-            isOpen
-              ? 'bg-white/70 dark:bg-[#0B0F19]/70 lg:bg-white/70 lg:dark:bg-[#0B0F19]/70'
-              : 'bg-white/70 dark:bg-[#0B0F19]/70'
+          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-px right-px bottom-px pointer-events-none backdrop-blur-xl saturate-150 rounded-2xl lg:rounded-[27px] border shadow-sm transition-colors duration-500 ${
+            isDarkNav
+              ? 'bg-[#0B0F19]/80 border-white/10'
+              : 'bg-white/75 border-slate-900/10'
           } ${
             mounted ? 'nav-shell__layer--animated' : ''
           } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
@@ -330,7 +391,7 @@ export default function Navbar() {
               : 'opacity-0 invisible pointer-events-none duration-[120ms]'
           }`}
         >
-          <ArrowDownIcon size={14} className="text-slate-900 dark:text-slate-300" />
+          <ArrowDownIcon size={14} className={`transition-colors duration-300 ${isDarkNav ? 'text-slate-300' : 'text-slate-900'}`} />
         </button>
 
         {/* Focus tracking lives here, not on the <header>: the pill button is a
@@ -384,20 +445,29 @@ export default function Navbar() {
                     aria-expanded={isActive}
                     aria-haspopup="true"
                     aria-controls={`nav-dropdown-${key}`}
-                    className="text-lg font-newsreader font-normal antialiased text-slate-900 dark:text-slate-100 hover:text-slate-700 dark:hover:text-white transition-colors h-full flex items-center gap-1.5 group cursor-pointer"
+                    className={`text-lg font-newsreader font-normal antialiased transition-colors h-full flex items-center gap-1.5 group cursor-pointer ${
+                      isDarkNav
+                        ? 'text-slate-100 hover:text-white'
+                        : 'text-slate-900 hover:text-slate-700'
+                    }`}
                   >
                     {link.name}
                     <ArrowDownIcon
                       size={12}
-                      className={`transition-transform duration-200 text-slate-900 dark:text-slate-100 group-hover:text-slate-700 dark:group-hover:text-white ${isActive ? 'rotate-180' : ''}`}
+                      className={`transition-transform duration-200 ${
+                        isDarkNav
+                          ? 'text-slate-100 group-hover:text-white'
+                          : 'text-slate-900 group-hover:text-slate-700'
+                      } ${isActive ? 'rotate-180' : ''}`}
                     />
                   </button>
 
-                    {/* Desktop Dropdown. Option 2: Unified Header Shell Expansion
-                        (Renders inside the expanded header glass shell without duplicate borders/shadows). */}
+                    {/* Desktop Dropdown */}
                     <div
                       id={`nav-dropdown-${key}`}
-                      className={`absolute top-[80px] left-1/2 -translate-x-1/2 w-[760px] max-w-[calc(100vw-2rem)] border-t border-slate-200/30 dark:border-slate-800/40 transition-all duration-300 ease-[var(--nav-ease)] motion-reduce:transition-none z-50 origin-top overflow-hidden ${
+                      className={`absolute top-[80px] left-1/2 -translate-x-1/2 w-[760px] max-w-[calc(100vw-2rem)] border-t transition-all duration-300 ease-[var(--nav-ease)] motion-reduce:transition-none z-50 origin-top overflow-hidden ${
+                        isDarkNav ? 'border-slate-800/40' : 'border-slate-200/50'
+                      } ${
                         isActive
                           ? 'opacity-100 translate-y-0 scale-100 delay-150 ease-out pointer-events-auto'
                           : 'opacity-0 -translate-y-2 scale-95 delay-0 duration-150 ease-in pointer-events-none'
@@ -411,7 +481,9 @@ export default function Navbar() {
                         {/* Left Content */}
                         <div className="w-1/2 pr-12 flex flex-col items-start justify-between">
                           <div>
-                            <h3 className="text-2xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-6 tracking-tight">
+                            <h3 className={`text-2xl font-google font-medium leading-tight mb-6 tracking-tight transition-colors ${
+                              isDarkNav ? 'text-white' : 'text-slate-900'
+                            }`}>
                               {cfg.heading}
                             </h3>
 
@@ -437,35 +509,53 @@ export default function Navbar() {
                                 )
                               ) : (
                                 <div className="absolute inset-0 flex items-center justify-center p-5">
-                                  <p className="text-sm font-google text-slate-600 dark:text-slate-400 leading-relaxed text-center">
+                                  <p className={`text-sm font-google leading-relaxed text-center transition-colors ${
+                                    isDarkNav ? 'text-slate-400' : 'text-slate-600'
+                                  }`}>
                                     {cfg.pitch}
                                   </p>
                                 </div>
                               )}
                             </div>
                           </div>
-                          <Link href={cfg.cta.href} onClick={() => setActiveDropdown(null)} className="px-5 py-2.5 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/50 dark:border-slate-800 text-slate-900 dark:text-white text-sm font-google font-medium rounded-full transition-colors">
+                          <Link href={cfg.cta.href} onClick={() => setActiveDropdown(null)} className={`px-5 py-2.5 border text-sm font-google font-medium rounded-full transition-colors ${
+                            isDarkNav
+                              ? 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-white'
+                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200/50 text-slate-900'
+                          }`}>
                             {cfg.cta.label}
                           </Link>
                         </div>
 
                         {/* Right Content - Item List */}
-                        <div className="w-1/2 flex flex-col divide-y divide-slate-200/70 dark:divide-slate-800/70">
+                        <div className={`w-1/2 flex flex-col divide-y ${
+                          isDarkNav ? 'divide-slate-800/70' : 'divide-slate-200/70'
+                        }`}>
                           {cfg.items.map((service, idx) => {
                             return (
                                <Link
                                 key={`${link.dropdownType}-drop-${idx}`}
                                 href={service.href ?? cfg.itemHref}
                                 onClick={() => setActiveDropdown(null)}
-                                className="group/item flex items-center justify-between px-4 py-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors"
+                                className={`group/item flex items-center justify-between px-4 py-3 rounded-2xl transition-colors ${
+                                  isDarkNav ? 'hover:bg-slate-900/50' : 'hover:bg-slate-50'
+                                }`}
                               >
                                 <div className="flex items-center gap-4">
                                   <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-70 group-hover/item:opacity-100 transition-opacity" />
-                                  <span className="text-[15px] font-google text-slate-700 dark:text-slate-300 group-hover/item:text-slate-900 dark:group-hover/item:text-slate-100 transition-colors">
+                                  <span className={`text-[15px] font-google transition-colors ${
+                                    isDarkNav
+                                      ? 'text-slate-300 group-hover/item:text-slate-100'
+                                      : 'text-slate-700 group-hover/item:text-slate-900'
+                                  }`}>
                                     {service.title}
                                   </span>
                                 </div>
-                                <span className="material-symbols-outlined text-[16px] text-slate-400 dark:text-slate-500 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 group-hover/item:translate-x-0.5 group-hover/item:-translate-y-0.5 transition-all duration-300 ease-out">
+                                <span className={`material-symbols-outlined text-[16px] transition-all duration-300 ease-out group-hover/item:translate-x-0.5 group-hover/item:-translate-y-0.5 ${
+                                  isDarkNav
+                                    ? 'text-slate-500 group-hover/item:text-blue-400'
+                                    : 'text-slate-400 group-hover/item:text-blue-600'
+                                }`}>
                                   arrow_outward
                                 </span>
                               </Link>
@@ -480,10 +570,14 @@ export default function Navbar() {
                   <Link
                     href={link.href}
                     onClick={(e) => handleLinkClick(e, link.href)}
-                    className="text-lg font-newsreader font-normal antialiased text-slate-900 dark:text-slate-100 hover:text-slate-700 dark:hover:text-white transition-colors py-2 relative group"
+                    className={`text-lg font-newsreader font-normal antialiased transition-colors py-2 relative group ${
+                      isDarkNav ? 'text-slate-100 hover:text-white' : 'text-slate-900 hover:text-slate-700'
+                    }`}
                   >
                     {link.name}
-                    <div className="absolute -bottom-1 left-0 w-full h-px bg-slate-900 dark:bg-slate-200 scale-x-0 group-hover:scale-x-100 transition-transform origin-left" />
+                    <div className={`absolute -bottom-1 left-0 w-full h-px scale-x-0 group-hover:scale-x-100 transition-transform origin-left ${
+                      isDarkNav ? 'bg-slate-200' : 'bg-slate-900'
+                    }`} />
                   </Link>
                 )}
               </div>
@@ -495,7 +589,9 @@ export default function Navbar() {
             <Show when="signed-out">
               <div className="h-full flex items-center px-1 xl:px-4 transition-colors duration-500">
                 <SignInButton mode="redirect">
-                  <button className="text-lg font-newsreader font-normal text-slate-900 dark:text-slate-100 hover:text-slate-700 dark:hover:text-white transition-colors px-4 py-3 cursor-pointer">
+                  <button className={`text-lg font-newsreader font-normal transition-colors px-4 py-3 cursor-pointer ${
+                    isDarkNav ? 'text-slate-100 hover:text-white' : 'text-slate-900 hover:text-slate-700'
+                  }`}>
                     Login
                   </button>
                 </SignInButton>
@@ -505,7 +601,9 @@ export default function Navbar() {
               <div className="h-full flex items-center px-3 lg:px-6 gap-6 transition-[background-color] duration-500 bg-transparent">
                 <Link
                   href="/dashboard"
-                  className="text-base font-google font-normal text-slate-900 dark:text-slate-100 hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600 transition-all ease-in-out duration-300 flex items-center gap-2 px-4 py-2"
+                  className={`text-base font-google font-normal transition-all ease-in-out duration-300 flex items-center gap-2 px-4 py-2 ${
+                    isDarkNav ? 'text-slate-100' : 'text-slate-900'
+                  } hover:text-transparent bg-clip-text bg-linear-to-r from-green-600 to-blue-600`}
                 >
                   <span className="material-symbols-outlined ">dashboard</span>
                 </Link>
@@ -539,7 +637,11 @@ export default function Navbar() {
             </Show>
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="h-16 w-16 flex items-center justify-center text-slate-900 dark:text-slate-200 rounded-none transition-colors bg-transparent active:bg-slate-50 dark:active:bg-slate-900"
+              className={`h-16 w-16 flex items-center justify-center rounded-none transition-colors bg-transparent ${
+                isDarkNav
+                  ? 'text-slate-100 active:bg-slate-900'
+                  : 'text-slate-900 active:bg-slate-50'
+              }`}
               aria-label="Toggle Menu"
               aria-expanded={isOpen}
               aria-controls="mobile-nav-menu"
@@ -574,7 +676,11 @@ export default function Navbar() {
                         onClick={() => setActiveMobileDropdown(isOpenMob ? null : link.dropdownType!)}
                         aria-expanded={isOpenMob}
                         aria-controls={`mob-dropdown-${link.dropdownType}`}
-                        className="w-full px-8 py-6 flex items-center justify-between text-xl font-newsreader font-normal text-slate-800 dark:text-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
+                        className={`w-full px-8 py-6 flex items-center justify-between text-xl font-newsreader font-normal transition-colors ${
+                          isDarkNav
+                            ? 'text-slate-100 hover:bg-slate-900/50'
+                            : 'text-slate-800 hover:bg-slate-50/50'
+                        }`}
                       >
                         <span>{link.name}</span>
                         <span
@@ -591,7 +697,9 @@ export default function Navbar() {
 
                           {/* Header (mirrors desktop) */}
                           <div className="px-2 py-4 mb-2">
-                            <h4 className="text-xl font-google font-medium text-slate-900 dark:text-white leading-tight mb-2 tracking-tight">
+                            <h4 className={`text-xl font-google font-medium leading-tight mb-2 tracking-tight transition-colors ${
+                              isDarkNav ? 'text-white' : 'text-slate-900'
+                            }`}>
                               {cfg.heading}
                             </h4>
                           </div>
@@ -605,20 +713,28 @@ export default function Navbar() {
                                   setIsOpen(false);
                                   setActiveMobileDropdown(null);
                                 }}
-                                className="group/item flex items-center justify-between px-4 py-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/30 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all duration-300"
+                                className={`group/item flex items-center justify-between px-4 py-4 rounded-2xl transition-all duration-300 ${
+                                  isDarkNav
+                                    ? 'bg-slate-900/30 hover:bg-slate-800/50'
+                                    : 'bg-slate-50/50 hover:bg-slate-100'
+                                }`}
                               >
                                 <div className="flex items-center gap-4">
                                   <img src={cfg.icon} alt="" decoding="async" className="w-5 h-auto opacity-40 group-hover/item:opacity-80 transition-opacity" />
                                   <div className="flex flex-col">
-                                    <span className="text-[15px] font-google font-medium text-slate-700 dark:text-slate-200 transition-colors">
+                                    <span className={`text-[15px] font-google font-medium transition-colors ${
+                                      isDarkNav ? 'text-slate-200' : 'text-slate-700'
+                                    }`}>
                                       {service.title}
                                     </span>
-                                    <span className="text-xs font-google text-slate-500 dark:text-slate-500">
+                                    <span className="text-xs font-google text-slate-500">
                                       {service.price}
                                     </span>
                                   </div>
                                 </div>
-                                <span className="material-symbols-outlined text-[16px] text-slate-300 dark:text-slate-600 group-hover/item:text-blue-600 dark:group-hover/item:text-blue-400 transition-colors">
+                                <span className={`material-symbols-outlined text-[16px] transition-colors ${
+                                  isDarkNav ? 'text-slate-600 group-hover/item:text-blue-400' : 'text-slate-300 group-hover/item:text-blue-600'
+                                }`}>
                                   chevron_right
                                 </span>
                               </Link>
@@ -628,7 +744,9 @@ export default function Navbar() {
                           <Link
                             href={cfg.cta.href}
                             onClick={() => setIsOpen(false)}
-                            className="mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-full bg-slate-100 dark:bg-slate-800 text-sm font-google font-medium text-slate-900 dark:text-white transition-colors"
+                            className={`mt-4 flex items-center justify-center gap-2 py-3 px-4 rounded-full text-sm font-google font-medium transition-colors ${
+                              isDarkNav ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-900'
+                            }`}
                           >
                             {cfg.cta.label}
                             <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -642,7 +760,11 @@ export default function Navbar() {
                     <Link
                       href={link.href}
                       onClick={(e) => handleLinkClick(e, link.href)}
-                      className="w-full px-8 py-6 flex items-center justify-between text-xl font-newsreader font-normal text-slate-800 dark:text-slate-100 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
+                      className={`w-full px-8 py-6 flex items-center justify-between text-xl font-newsreader font-normal transition-colors ${
+                        isDarkNav
+                          ? 'text-slate-100 hover:bg-slate-900/50'
+                          : 'text-slate-800 hover:bg-slate-50/50'
+                      }`}
                     >
                       <span>{link.name}</span>
                       <span className="material-symbols-outlined text-[18px] opacity-40">chevron_right</span>
@@ -651,7 +773,7 @@ export default function Navbar() {
 
                   {/* Padded divider line under navlinks except the last one */}
                   {navIdx !== navLinks.length - 1 && (
-                    <div className="mx-8 h-px bg-slate-200/60 dark:bg-slate-800/60" />
+                    <div className={`mx-8 h-px ${isDarkNav ? 'bg-slate-800/60' : 'bg-slate-200/60'}`} />
                   )}
                 </div>
               ))}
