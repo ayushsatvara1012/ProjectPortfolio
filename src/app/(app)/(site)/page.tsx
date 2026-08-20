@@ -4,6 +4,7 @@ import { buildMetadata } from '@/src/seo/buildMetadata';
 import { PRODUCT } from '@/src/lib/brand';
 
 import HeroSection from '@/src/components/marketing/HeroSection';
+import AgentShowcaseSection from '@/src/components/marketing/AgentShowcaseSection';
 import HeroHorizonField from '@/src/components/marketing/HeroHorizonField';
 // import SocialProofBar from '@/src/components/marketing/SocialProofBar'; // hidden for now — component kept in src/components/marketing/SocialProofBar.tsx
 import ChatbotShowcase from '@/src/components/marketing/home/ChatbotShowcase';
@@ -130,6 +131,7 @@ export default function HomePage() {
       <main className="relative overflow-x-clip bg-[#FAFAFC] dark:bg-[#0B0F19] transition-colors duration-500">
         <div className="relative z-10">
           <HeroSection />
+          <AgentShowcaseSection />
           {/* <SocialProofBar /> */}
           <ChatbotShowcase />
           <FeatureGrid />
