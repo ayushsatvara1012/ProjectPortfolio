@@ -5,6 +5,7 @@
   --font-display: "Plus Jakarta Sans", var(--font-google), sans-serif;
   --font-google: "Plus Jakarta Sans", var(--font-google), sans-serif;
   --font-newsreader: var(--font-newsreader), "Newsreader", serif;
+  --font-gloock: var(--font-gloock), "Gloock", serif;
 }
 
 @theme {

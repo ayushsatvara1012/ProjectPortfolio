@@ -99,14 +99,18 @@ export default function Footer() {
         aria-hidden
         className="pointer-events-none select-none relative w-full overflow-hidden flex flex-col justify-end items-center"
       >
-        {/* Wordmark SVG (black container split background is natively embedded inside the SVG) */}
+        {/* Wordmark SVG (natively matches light #FAFAFC and dark #0B0F19 background theme) */}
         <div className="relative z-10 w-full grid">
           <img
             src="/footer.svg"
             alt="Sapybase Footer"
-            className="w-full h-auto translate-y-20"
+            className="w-full h-auto translate-y-20 dark:hidden"
           />
-         
+          <img
+            src="/footer-dark.svg"
+            alt="Sapybase Footer Dark"
+            className="w-full h-auto translate-y-20 hidden dark:block"
+          />
         </div>
       </div>
     </footer>

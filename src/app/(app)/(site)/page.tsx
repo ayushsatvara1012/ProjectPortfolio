@@ -129,25 +129,9 @@ export default function HomePage() {
       />
       <main className="relative overflow-x-clip bg-[#FAFAFC] dark:bg-[#0B0F19] transition-colors duration-500">
         <div className="relative z-10">
-          {/* Hero + Second Section Shared Pinned Viewport Background Container */}
-          <div className="relative bg-slate-950 text-slate-100">
-            {/* Sticky Pinned Viewport Layer (Exact 100vh Hero Dimensions, Fixed during scroll) */}
-            <div className="pointer-events-none absolute inset-0 z-0 hidden sm:block">
-              <div className="sticky top-0 h-screen w-full overflow-hidden">
-                {/* Layer 0: Blurred, Faded Colored SVG Wash (/image 1.svg) */}
-                <div className="absolute inset-0 bg-[url('/image%201.svg')] bg-cover bg-center bg-no-repeat opacity-40 blur-[3px] scale-[1.15]" />
-                {/* Layer 1: 3D Rotating Terrain Horizon Canvas */}
-                <HeroHorizonField className="absolute inset-0 h-full w-full text-white" />
-              </div>
-            </div>
-
-            {/* Layer 2: Scrolling Section Contents */}
-            <div className="relative z-10">
-              <HeroSection hideHorizon hideWash />
-              {/* <SocialProofBar /> */}
-              <ChatbotShowcase />
-            </div>
-          </div>
+          <HeroSection />
+          {/* <SocialProofBar /> */}
+          <ChatbotShowcase />
           <FeatureGrid />
           {/* <WhatWeSolve /> */}
           {/* <ScrollTravelSection /> */}

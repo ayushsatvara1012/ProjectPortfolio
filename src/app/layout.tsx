@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
-import { Plus_Jakarta_Sans, Inter, Newsreader } from 'next/font/google';
+import { Plus_Jakarta_Sans, Inter, Newsreader, Gloock } from 'next/font/google';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 import SmoothScrollProvider from '@/src/components/SmoothScrollProvider';
@@ -22,6 +22,13 @@ const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-inter',
+});
+
+const gloock = Gloock({
+  weight: '400',
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-gloock',
 });
 
 // A fallback minimal metadata in case a route misses it.
@@ -50,7 +57,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${googleSans.variable} ${inter.variable} ${newsreader.variable}`}>
+    <html lang="en" className={`${googleSans.variable} ${inter.variable} ${newsreader.variable} ${gloock.variable}`}>
       <head>
         {/* Google tag (gtag.js) */}
         <Script
