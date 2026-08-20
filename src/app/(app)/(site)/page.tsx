@@ -128,7 +128,7 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
       />
-      <main className="relative overflow-x-clip bg-[#FAFAFC] dark:bg-[#0B0F19] transition-colors duration-500">
+      <main className="relative overflow-x-clip bg-[#FAFAFC] dark:bg-black transition-colors duration-500">
         <div className="relative z-10">
           <HeroSection />
           <AgentShowcaseSection />

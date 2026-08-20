@@ -90,7 +90,7 @@
     scrollbar-width: none;
     -ms-overflow-style: none;
     font-weight: 450;
-    @apply font-sans antialiased text-slate-500 bg-white dark:bg-slate-950 dark:text-slate-400;
+    @apply font-sans antialiased text-slate-500 bg-white dark:bg-black dark:text-slate-400;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 

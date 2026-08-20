@@ -581,7 +581,7 @@ export default function PreFooterCanvas({
     <section
       ref={containerRef}
       aria-hidden="true"
-      className={className ?? "relative w-full min-h-screen h-screen bg-[#FAFAFC] dark:bg-[#0B0F19] text-[#0F172A] dark:text-white overflow-hidden select-none flex items-center justify-center transition-colors duration-500"}
+      className={className ?? "relative w-full min-h-screen h-screen bg-[#FAFAFC] dark:bg-black text-[#0F172A] dark:text-white overflow-hidden select-none flex items-center justify-center transition-colors duration-500"}
     >
       {/* HTML5 Fixed Dot Matrix Canvas Layer */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block z-0 cursor-default" />

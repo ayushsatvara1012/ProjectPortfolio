@@ -23,7 +23,7 @@ export const PRODUCT = {
   name: 'Vaayu',
   tagline: 'Vaayu — A Business Intelligence',
   /** Path to the product mark in /public. */
-  logo: '/vaayu_logo.svg',
+  logo: '/nav_brand.svg',
   /** Short endorsement suffix, e.g. for footers and lockups. */
   endorsement: 'by Sapybase',
   /** Full endorsed lockup string. */

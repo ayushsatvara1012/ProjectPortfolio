@@ -10,8 +10,8 @@ type VaayuLogoProps = {
   iconOnly?: boolean;
 };
 
-// Intrinsic aspect ratio of /public/vaayu_logo.svg (36 × 23).
-const MARK_RATIO = 36 / 23;
+// Intrinsic aspect ratio of /public/hero-spiral-brand.svg (508 × 506).
+const MARK_RATIO = 508 / 506;
 
 /**
  * Vaayu product logo — the real mark from /public/vaayu_logo.svg plus the

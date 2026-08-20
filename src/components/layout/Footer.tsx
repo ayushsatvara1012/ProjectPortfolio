@@ -51,7 +51,7 @@ const footerColumns: FooterColumn[] = [
 
 export default function Footer() {
   return (
-    <footer className="relative overflow-hidden bg-[#FAFAFC] dark:bg-[#0B0F19]">
+    <footer className="relative overflow-hidden bg-[#FAFAFC] dark:bg-black">
       <div className="max-w-8xl mx-auto px-6 min-[1011px]:px-12 pt-16 pb-10 min-[1011px]:pt-20">
         {/* Plain link directory: bold heading, stacked plain links in a 3x2 grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-12">
@@ -104,12 +104,7 @@ export default function Footer() {
           <img
             src="/footer.svg"
             alt="Sapybase Footer"
-            className="w-full h-auto translate-y-20 dark:hidden"
-          />
-          <img
-            src="/footer-dark.svg"
-            alt="Sapybase Footer Dark"
-            className="w-full h-auto translate-y-20 hidden dark:block"
+            className="w-full h-auto translate-y-20"
           />
         </div>
       </div>

@@ -113,7 +113,8 @@ export function drawGalaxySky(
   ctx: CanvasRenderingContext2D,
   sky: GalaxySky,
   fadeHeight: number | null,
-  timeSec: number = 0
+  timeSec: number = 0,
+  isDark: boolean = true
 ) {
   // 1. NEBULAE WASH (Disabled/Empty per request)
   if (sky.nebulae.length > 0) {
@@ -147,15 +148,17 @@ export function drawGalaxySky(
 
     if (a <= 0.02) return;
 
+    const starRgb = isDark ? s.colorRgb : '71, 85, 105';
+
     if (s.big) {
       ctx.save();
-      ctx.shadowColor = `rgba(${s.colorRgb}, ${(a * 0.85).toFixed(3)})`;
-      ctx.shadowBlur = 5;
+      ctx.shadowColor = `rgba(${starRgb}, ${(a * 0.85).toFixed(3)})`;
+      ctx.shadowBlur = isDark ? 5 : 2;
     }
 
     ctx.beginPath();
     ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${s.colorRgb}, ${a.toFixed(3)})`;
+    ctx.fillStyle = `rgba(${starRgb}, ${a.toFixed(3)})`;
     ctx.fill();
 
     if (s.big) {

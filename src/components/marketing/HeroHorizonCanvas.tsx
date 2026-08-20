@@ -109,8 +109,12 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
         ctx.save();
         ctx.scale(scaleX, scaleY);
 
-        // 0. GALAXY SKY: dynamic starfield on pitch dark background
-        drawGalaxySky(ctx, SKY, HORIZON, elapsedSec);
+        const isDark =
+          document.documentElement.classList.contains('dark') ||
+          darkQuery.matches;
+
+        // 0. GALAXY SKY: dynamic starfield
+        drawGalaxySky(ctx, SKY, HORIZON, elapsedSec, isDark);
 
         // 1. PAINTER'S ALGORITHM FACET RENDERING
         for (const facet of facets) {
@@ -152,16 +156,20 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
           const avgH = (h00 + h10 + h11 + h01) / 4;
           const elevationShade = Math.min(1, avgH / 5);
 
-          // Darker deep space navy facet fill
+          // Theme-adaptive facet fill
           const facetAlpha = Math.min(0.8, 0.32 + (28 - d00) / 65 + elevationShade * 0.15);
-          ctx.fillStyle = `rgba(14, 20, 34, ${facetAlpha.toFixed(3)})`;
+          ctx.fillStyle = isDark
+            ? `rgba(0, 0, 0, ${facetAlpha.toFixed(3)})`
+            : `rgba(245, 249, 255, ${facetAlpha.toFixed(3)})`;
           ctx.fill();
 
           if (alpha <= 0.01) continue;
 
-          // Subtle slate/starlight wireframe stroke so terrain grid is clearly visible & brighter
-          ctx.strokeStyle = `rgba(148, 163, 184, ${(alpha * 0.45).toFixed(3)})`;
-          ctx.lineWidth = Math.abs(u) % 6 === 0 || Math.floor(v) % 6 === 0 ? 1.3 : 0.85;
+          // Theme-adaptive wireframe stroke (slate-400 in dark, pure white in light)
+          ctx.strokeStyle = isDark
+            ? `rgba(148, 163, 184, ${(alpha * 0.35).toFixed(3)})`
+            : `rgba(127, 146, 176, ${(alpha * 0.65).toFixed(3)})`;
+          ctx.lineWidth = Math.abs(u) % 6 === 0 || Math.floor(v) % 6 === 0 ? 1.2 : 0.75;
           ctx.stroke();
         }
 
