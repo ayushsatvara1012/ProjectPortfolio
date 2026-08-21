@@ -1,11 +1,13 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
+import VerticalsSection from './VerticalsSection';
 
 export default function AgentShowcaseSection() {
   return (
     <section className="relative py-16 sm:py-24 overflow-hidden transition-colors duration-500 text-slate-900 dark:text-slate-100">
-      <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 space-y-24 lg:space-y-32">
+      <div className="relative z-10 max-w-8xl mx-auto px-6 sm:px-8 lg:px-12 space-y-24 lg:space-y-32">
         {/* Showcase Block 1: Customer Chat */}
         <div>
           {/* Main Section Header */}
@@ -26,16 +28,17 @@ export default function AgentShowcaseSection() {
               </p>
             </div>
 
-            {/* Right Column: Clean Frame with gen_chat.svg (spans ~60%) */}
+            {/* Right Column: Clean Frame with the conversation illustration (spans ~60%) */}
             <div className="lg:col-span-7 w-full flex items-center justify-center">
               <div className="relative w-full overflow-hidden flex items-center justify-center">
                 {/* SVG Illustration with no background and no drop shadow */}
-                <img
-                  src="/gen_chat.svg"
+                <Image
+                  src="/Tools_Image2.webp"
                   alt="Vaayu Generic Chatbot Customer Conversation"
                   className="w-full h-auto block max-w-full"
-                  width={723}
-                  height={542}
+                  width={2169}
+                  height={1626}
+                  sizes="(min-width: 1280px) 658px, (min-width: 1024px) 55vw, calc(100vw - 3rem)"
                 />
               </div>
             </div>
@@ -47,12 +50,13 @@ export default function AgentShowcaseSection() {
           {/* Left Column on Desktop (Image): Order 2 on Mobile, Order 1 on Desktop */}
           <div className="order-2 lg:order-1 lg:col-span-7 w-full flex items-center justify-center">
             <div className="relative w-full overflow-hidden flex items-center justify-center">
-              <img
-                src="/chem_chat.svg"
+              <Image
+                src="/Tools_Image.webp"
                 alt="Chemical Industry Chatbot Tools"
                 className="w-full h-auto block max-w-full"
-                width={723}
-                height={542}
+                width={2169}
+                height={1626}
+                sizes="(min-width: 1280px) 658px, (min-width: 1024px) 55vw, calc(100vw - 3rem)"
               />
             </div>
           </div>
@@ -68,6 +72,9 @@ export default function AgentShowcaseSection() {
             </p>
           </div>
         </div>
+
+        {/* Verticals Section: Sliding Pill Navbar & 3 Rectangles */}
+        <VerticalsSection />
       </div>
     </section>
   );

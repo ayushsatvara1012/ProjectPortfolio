@@ -74,12 +74,18 @@ const nextConfig = {
           },
         ],
       },
-      // Static media in /public — content-hashed by usage, safe to cache long-term.
-      // If an image is replaced in-place, rename the file to bust the cache.
+      // Static media in /public. Files here are NOT content-hashed, so in-place
+      // replacement is the normal workflow - dev must revalidate or a re-exported
+      // asset keeps rendering from the browser cache.
       {
         source: '/:all*(svg|webp|png|jpg|jpeg|avif|ico|mp4)',
         headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
+          {
+            key: 'Cache-Control',
+            value: isDev
+              ? 'no-cache'
+              : 'public, max-age=31536000, immutable',
+          },
         ],
       },
       // Widget assets — public CDN-style, no framing restriction
