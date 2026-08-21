@@ -17,8 +17,13 @@ export default function HeroSection({ hideHorizon = false, hideWash = false }: H
 
       {/* Background image behind terrain */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 hidden sm:block dark:hidden bg-cover bg-center opacity-90"
+        className="pointer-events-none absolute inset-0 z-0 hidden sm:block bg-cover bg-center opacity-90 dark:opacity-50"
         style={{ backgroundImage: "url('/hero_coloredBG.webp')" }}
+        aria-hidden="true"
+      />
+      {/* Dark layer over background image for dark theme */}
+      <div
+        className="pointer-events-none absolute inset-0 z-0 hidden sm:dark:block bg-black/60"
         aria-hidden="true"
       />
 
@@ -36,7 +41,7 @@ export default function HeroSection({ hideHorizon = false, hideWash = false }: H
             </span>
 
             {/* Element 2: Main Title */}
-            <h1 className="font-gloock font-normal text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-slate-900 dark:text-white leading-tight tracking-normal transition-colors">
+            <h1 className="font-gloock font-normal text-3xl sm:text-4xl md:text-5xl lg:text-6xl text-slate-900 dark:text-white leading-tight tracking-normal transition-colors">
               Meet Vaayu
             </h1>
 
@@ -71,8 +76,23 @@ export default function HeroSection({ hideHorizon = false, hideWash = false }: H
   );
 }
 
-/* ⚠️ PLACEHOLDER wordmarks — swap for real customer logos before launch. */
-const TRUSTED_BY = ['Gyanesha Institute', 'Expresolv Ltd.', 'SP Designs'];
+const BRAND_LOGOS = [
+  {
+    name: 'Gyanesha Institute',
+    src: '/Brand_Gyanesha.svg',
+    heightClass: 'h-10 sm:h-14 lg:h-16',
+  },
+  {
+    name: 'Expresolv Ltd.',
+    src: '/Brand_expresolv.svg',
+    heightClass: 'h-8 sm:h-11 lg:h-12',
+  },
+  {
+    name: 'SP Designs',
+    src: '/Brand_SPdesigns.svg',
+    heightClass: 'h-10 sm:h-14 lg:h-16',
+  },
+];
 
 function DemoButton() {
   return (
@@ -88,14 +108,14 @@ function TrustedByStrip() {
       <p className="text-center text-xs font-google font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
         Businesses building with {PRODUCT.name}
       </p>
-      <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 sm:gap-x-14">
-        {TRUSTED_BY.map((name) => (
-          <span
-            key={name}
-            className="text-base sm:text-lg md:text-xl font-google font-semibold tracking-tight text-slate-700 dark:text-slate-300 select-none"
-          >
-            {name}
-          </span>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-8 sm:gap-x-20">
+        {BRAND_LOGOS.map((brand) => (
+          <img
+            key={brand.name}
+            src={brand.src}
+            alt={brand.name}
+            className={`${brand.heightClass} w-auto object-contain opacity-85 hover:opacity-100 transition-all duration-300 select-none filter invert dark:invert-0`}
+          />
         ))}
       </div>
     </div>
