@@ -40,21 +40,24 @@ const CHEMICAL_CARDS = [
 
 const SLIDE_MS = 5000;
 
-// Carousel geometry, all expressed as multiples of the card width w.
-// The centred card is fully visible, its two neighbours are cropped to a 30%
-// sliver by the rail, and a 0.07w gutter sits between them. That fixes the rail
-// at 2 * (0.5 + 0.07 + 0.3) = 1.74w, which in turn fixes each slot's offset.
-const RAIL_W = 1.74;
-const POS_CENTER = 0.37; // (RAIL_W - 1) / 2
-const POS_PREV = -0.7; // peek - 1
-const POS_NEXT = 1.44; // RAIL_W - peek
 const CARD_ASPECT = 407 / 395;
-const SLOT_OFFSET = [POS_CENTER, POS_NEXT, POS_PREV];
 
-// The card is sized off the viewport height so the centred art lands at ~60vh,
-// then capped by the rail so a short, narrow window shrinks it instead of
-// cropping the neighbours further. 57.47cqw is 100 / RAIL_W.
-const CARD_WIDTH = 'min(clamp(300px, 58.23vh, 640px), 57.47cqw)';
+// The rail runs edge to edge, so the card width is what sets the gutter: the
+// centred card takes the middle, each neighbour is pinned to a screen edge with
+// a 30% sliver showing, and whatever is left over falls between them. A card at
+// 100 / 1.74 = 57.47vw closes that gutter to the reference's 0.07w; anything
+// narrower simply opens it up. The cap stops ultra-wide screens running the
+// section past a comfortable height.
+const CARD_WIDTH = 'clamp(300px, 57.47vw, 980px)';
+
+// Slot 0 is centred, 1 is the right sliver, 2 is the left one. cqw resolves
+// against the rail itself, so the slivers stay pinned to the real edges even
+// where the clamp above stops the card growing.
+const SLOT_TRANSFORM = [
+  'calc(50cqw - 0.5 * var(--cw))',
+  'calc(100cqw - 0.3 * var(--cw))',
+  'calc(-0.7 * var(--cw))',
+];
 
 // Grid is max-w-8xl with lg padding 48px/side and 32px gaps, so each card
 // settles at ~373px once the container caps out. Below lg the grid stacks
@@ -196,7 +199,6 @@ export default function VerticalsSection() {
         onMouseLeave={() => setPaused(false)}
         onFocusCapture={() => setPaused(true)}
         onBlurCapture={() => setPaused(false)}
-        style={{ containerType: 'inline-size' }}
       >
         <h3 className="font-google font-semibold tracking-tight leading-[1.1] text-4xl xl:text-[2.5rem] text-slate-900 dark:text-white">
           {SECTION_TITLE}
@@ -209,11 +211,16 @@ export default function VerticalsSection() {
           {activeCard.description}
         </p>
 
+        {/* Breaks out of the section's padded column so the rail reaches both
+            screen edges and the slivers are cropped by the window, not by a
+            gutter sitting inside the page. */}
         <div
-          className="relative mt-10 mx-auto overflow-hidden"
+          className="relative mt-10 overflow-hidden"
           style={{
             ['--cw' as string]: CARD_WIDTH,
-            width: `calc(${RAIL_W} * var(--cw))`,
+            containerType: 'inline-size',
+            width: '100vw',
+            marginLeft: 'calc(50% - 50vw)',
             height: `calc(${CARD_ASPECT} * var(--cw))`,
           }}
         >
@@ -236,7 +243,7 @@ export default function VerticalsSection() {
                 }`}
                 style={{
                   width: 'var(--cw)',
-                  transform: `translateX(calc(${SLOT_OFFSET[slot]} * var(--cw)))`,
+                  transform: `translateX(${SLOT_TRANSFORM[slot]})`,
                   opacity: isTeleporting ? 0 : 1,
                   transition:
                     isTeleporting || reducedMotion
@@ -250,7 +257,7 @@ export default function VerticalsSection() {
                     alt=""
                     fill
                     unoptimized
-                    sizes="(min-width: 1024px) 60vh, 60vw"
+                    sizes="(min-width: 1024px) 58vw, 100vw"
                     className="object-cover"
                   />
                   <card.Art />
