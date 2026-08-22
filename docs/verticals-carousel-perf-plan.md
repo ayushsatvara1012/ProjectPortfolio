@@ -56,24 +56,44 @@ Layout switches by CSS only, so there is no hydration flash and no media-query h
 
 Fixes findings 1, 5, 8.
 
-### Slice 2 - gate the timer
+### Slice 2 - remove the auto-advance entirely
 
-`IntersectionObserver` on the rail plus `document.visibilitychange`.
-The interval only exists while the section is on screen in a visible tab.
+Owner decision after the first pass: the deck advances on click and nothing else.
 
-Fixes finding 2.
+This is strictly better than gating the timer, which is what the first pass did
+(`IntersectionObserver` + `visibilitychange` + `matchMedia`).
+With no timer there is nothing to gate, so all of that goes: no observer, no
+media-query hooks, no pause state, no `visibilitychange` listener.
+The component's only remaining state is `{ active, previous }` and it runs no
+effects at all.
+
+Fixes finding 2 by deletion, and dissolves finding 7 - a five-second timer was the
+only reason the description could not be a live region.
 
 ### Slice 3 - compositing
 
-`will-change: transform` and `backface-visibility: hidden` on the three carousel cards, applied only when motion is actually enabled.
+`backface-visibility: hidden` on the cards, plus `will-change: transform` taken out
+**in CSS only**, via `lg:group-hover:` / `lg:group-focus-within:` on the rail.
+
+Promotion costs a compositor layer per card - several MB each at a 720px card - so
+it is held only while the rail is hovered or holds focus, which with click-only
+advance is exactly the window in which a move can be coming.
+Doing this with a hook would mean state, an effect and a re-render for something
+the compositor can decide by itself.
+Tailwind wraps `group-hover` in `@media (hover: hover)`, so touch devices do not
+get stuck promoted.
 
 Fixes finding 3.
 
 ### Slice 4 - accessibility
 
-- Drop `aria-live` from the rotating description.
-- Add a real pause/resume control.
-- Centred card overlay becomes inert (`aria-hidden`, `tabIndex -1`, `pointer-events: none`) rather than an unnamed button.
+- Keep `aria-live="polite"` on the description. It is correct once the text changes
+  only on click: one announcement per user action.
+- The centred card's overlay stays **enabled and focusable**. Disabling it would
+  drop focus on the floor for keyboard users, because the button they just
+  activated is the one that becomes centred. It carries `aria-current` and a
+  "Showing X" / "Show X" label instead, which also gives it the accessible name it
+  was missing.
 
 Fixes findings 6, 7.
 
@@ -88,4 +108,18 @@ Fixes findings 4, 9, 10.
 ## Verification
 
 `npx tsc --noEmit`, `npm run lint`, `npm run test` must stay green.
-Browser verification is the user's call per CLAUDE.md - never self-started.
+
+Arbitrary Tailwind utilities are proved by compiling the sheet and grepping it:
+
+```
+npx @tailwindcss/cli -i src/app/globals.css -o /tmp/out.css \
+  --content src/components/marketing/VerticalsSection.tsx
+```
+
+Grep the **escaped** selector, not the declaration - the class name is written
+`.lg\:group-hover\:\[will-change\:transform\]`, so a plain `will-change:transform`
+search returns nothing and looks like a failure when the rule is present.
+
+There is no `distDir` / `NEXT_DIST_DIR` override in `next.config`, so `next build`
+writes into the shared `.next/` and can disturb the owner's dev server.
+Browser verification is the owner's call per CLAUDE.md - never self-started.

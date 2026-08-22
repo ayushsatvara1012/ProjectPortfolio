@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import NextImage from 'next/image';
 import SdsCardArt from './verticals/SdsCardArt';
 import CoaCardArt from './verticals/CoaCardArt';
@@ -38,12 +38,7 @@ const CHEMICAL_CARDS = [
   },
 ];
 
-const SLIDE_MS = 5000;
-
 const CARD_ASPECT = 407 / 395;
-
-const DESKTOP_QUERY = '(min-width: 1024px)';
-const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 // Height the heading, the two-line description and their margins take above the
 // rail, plus a little breathing room, so the rest of the viewport is what the
@@ -62,10 +57,10 @@ const STEP_ROTATE = 8;
 const STEP_SCALE = 0.14;
 const CENTRE_Z = 30;
 
-// One card per step has to get from one flank to the other, crossing the whole
-// deck. Both flanks sit on the same z-index, so without a layer of its own the
-// crosser ties with the outgoing centre card and DOM order decides - it slides
-// over the top of it. This puts it under everything until it arrives.
+// A card picked from one flank has to reach the other, crossing the whole deck.
+// Both flanks sit on the same z-index, so without a layer of its own the crosser
+// ties with the outgoing centre card and DOM order decides - it slides over the
+// top of it. This puts it under everything until it arrives.
 const CROSSING_Z = 1;
 
 // Tilting and dropping the flanks pushes them past the centred card's box, so
@@ -94,6 +89,15 @@ const CARD_SHELL = 'w-full min-w-0 overflow-hidden flex flex-col';
 const CARD_ART_FRAME =
   'relative w-full aspect-[395/407] overflow-hidden rounded-[18px]';
 
+// Promoting a card costs a compositor layer, and at a 720px card that is several
+// megabytes each. The deck only ever moves in response to a click, so the layers
+// are taken out purely in CSS while the rail is hovered or holds focus - which is
+// the only moment a move can be coming - and handed straight back afterwards.
+// Doing this with a hook would mean state, an effect and a re-render for
+// something the compositor can decide on its own.
+const CARD_PROMOTION =
+  'lg:group-hover:[will-change:transform] lg:group-focus-within:[will-change:transform]';
+
 // Signed ring distance from the centre: 0 is centred, +1 the first slot to the
 // right, -1 the first to the left, wrapping the long way round for the rest.
 function signedOffset(slot: number, total: number) {
@@ -113,31 +117,12 @@ function slotTransform(offset: number) {
   ].join(' ');
 }
 
-function useMatchMedia(query: string) {
-  const [matches, setMatches] = useState(false);
-  useEffect(() => {
-    const list = window.matchMedia(query);
-    const sync = () => setMatches(list.matches);
-    sync();
-    list.addEventListener('change', sync);
-    return () => list.removeEventListener('change', sync);
-  }, [query]);
-  return matches;
-}
-
 export default function VerticalsSection() {
   // The card being left behind is tracked alongside the current one so the card
   // crossing the deck can be spotted on the very render that starts its move.
+  // This is the component's only state: the deck advances on click and nothing
+  // else, so there is no timer, no observer and no media query to keep in step.
   const [{ active, previous }, setDeck] = useState({ active: 0, previous: 0 });
-  const [hoverPaused, setHoverPaused] = useState(false);
-  const [userPaused, setUserPaused] = useState(false);
-  // Off screen or in a background tab the deck has nothing to say, so the timer
-  // and the compositor layers it needs are both stood down.
-  const [onScreen, setOnScreen] = useState(false);
-  const railRef = useRef<HTMLDivElement>(null);
-
-  const isDesktop = useMatchMedia(DESKTOP_QUERY);
-  const reducedMotion = useMatchMedia(REDUCED_MOTION_QUERY);
 
   const goTo = (next: number) =>
     setDeck((current) =>
@@ -146,89 +131,26 @@ export default function VerticalsSection() {
         : { active: next, previous: current.active },
     );
 
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-
-    let intersecting = false;
-    const sync = () => setOnScreen(intersecting && !document.hidden);
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        intersecting = entries[entries.length - 1].isIntersecting;
-        sync();
-      },
-      { threshold: 0.15 },
-    );
-    observer.observe(rail);
-    document.addEventListener('visibilitychange', sync);
-
-    return () => {
-      observer.disconnect();
-      document.removeEventListener('visibilitychange', sync);
-    };
-  }, []);
-
-  const advancing =
-    isDesktop && onScreen && !hoverPaused && !userPaused && !reducedMotion;
-
-  // A click still glides the deck while it is paused, so the cards keep their
-  // compositor layers for as long as the deck is on screen and animatable.
-  const promoted = isDesktop && onScreen && !reducedMotion;
-
-  useEffect(() => {
-    if (!advancing) return;
-    const timer = window.setInterval(
-      () =>
-        setDeck((current) => ({
-          active: (current.active + 1) % CHEMICAL_CARDS.length,
-          previous: current.active,
-        })),
-      SLIDE_MS,
-    );
-    return () => window.clearInterval(timer);
-  }, [advancing]);
-
   const activeCard = CHEMICAL_CARDS[active];
   const total = CHEMICAL_CARDS.length;
 
   return (
-    <div
-      className="w-full pt-8 sm:pt-12"
-      onMouseEnter={() => setHoverPaused(true)}
-      onMouseLeave={() => setHoverPaused(false)}
-      onFocusCapture={() => setHoverPaused(true)}
-      onBlurCapture={() => setHoverPaused(false)}
-    >
+    <div className="w-full pt-8 sm:pt-12">
       <h3 className="text-center lg:text-left font-google font-semibold tracking-tight lg:leading-[1.1] text-3xl sm:text-4xl xl:text-[2.5rem] text-slate-900 dark:text-white">
         {SECTION_TITLE}
       </h3>
 
       {/* The blurb tracks the centred card, so it only exists where the deck
-          does. It is deliberately not a live region: it would re-announce every
-          five seconds and talk over whatever the reader was on. */}
-      <div className="hidden lg:flex mt-4 items-start gap-4">
-        <p className="max-w-5xl font-google text-lg xl:text-xl leading-[1.6] text-slate-600 dark:text-slate-300 line-clamp-2 min-h-[3.2em]">
-          {activeCard.description}
-        </p>
-
-        {!reducedMotion && (
-          <button
-            type="button"
-            onClick={() => setUserPaused((current) => !current)}
-            className="shrink-0 mt-1 inline-flex items-center justify-center h-9 w-9 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[20px]" aria-hidden>
-              {userPaused ? 'play_arrow' : 'pause'}
-            </span>
-            <span className="sr-only">
-              {userPaused
-                ? 'Resume the tools carousel'
-                : 'Pause the tools carousel'}
-            </span>
-          </button>
-        )}
-      </div>
+          does. A polite live region is right here because the text now changes
+          only when someone picks a card - one announcement per click. It was
+          wrong while the deck advanced on a timer, which re-announced every five
+          seconds over whatever the reader was on. */}
+      <p
+        aria-live="polite"
+        className="hidden lg:block mt-4 max-w-5xl font-google text-lg xl:text-xl leading-[1.6] text-slate-600 dark:text-slate-300 line-clamp-2 min-h-[3.2em]"
+      >
+        {activeCard.description}
+      </p>
 
       {/* One tree for both layouts. Below lg it is a plain stack; at lg the same
           cards become the deck, breaking out of the section's padded column so
@@ -238,15 +160,11 @@ export default function VerticalsSection() {
           inline SVG and a bitmap - was in the DOM twice, and the SVGs' mask ids
           collided. */}
       <div
-        ref={railRef}
-        className="mt-10 sm:mt-14 lg:mt-10 grid grid-cols-1 gap-6 lg:block lg:relative lg:overflow-hidden lg:w-screen lg:ml-[calc(50%-50vw)] lg:h-[calc(var(--rail-h)*var(--ch))] lg:[container-type:inline-size]"
+        className="group mt-10 sm:mt-14 lg:mt-10 grid grid-cols-1 gap-6 lg:block lg:relative lg:overflow-hidden lg:w-screen lg:ml-[calc(50%-50vw)] lg:h-[calc(var(--rail-h)*var(--ch))] lg:[container-type:inline-size]"
         style={{
           ['--cw' as string]: CARD_WIDTH,
           ['--ch' as string]: `calc(${CARD_ASPECT} * var(--cw))`,
           ['--rail-h' as string]: String(RAIL_H),
-          // Promoting the cards costs a compositor layer each, so they are only
-          // promoted while the deck is actually on screen and moving.
-          ['--card-will-change' as string]: promoted ? 'transform' : 'auto',
         }}
       >
         {CHEMICAL_CARDS.map((card, index) => {
@@ -259,7 +177,7 @@ export default function VerticalsSection() {
           return (
             <article
               key={card.id}
-              className={`${CARD_SHELL} lg:absolute lg:left-0 lg:top-0 lg:w-[var(--cw)] lg:rounded-[18px] lg:shadow-[0_18px_50px_-12px_rgba(15,23,42,0.28)] lg:[transform:var(--slot-transform)] lg:[z-index:var(--slot-z)] lg:[will-change:var(--card-will-change)] lg:[backface-visibility:hidden] lg:transition-transform lg:duration-[900ms] lg:ease-[cubic-bezier(0.45,0,0.25,1)] lg:motion-reduce:transition-none`}
+              className={`${CARD_SHELL} ${CARD_PROMOTION} lg:absolute lg:left-0 lg:top-0 lg:w-[var(--cw)] lg:rounded-[18px] lg:shadow-[0_18px_50px_-12px_rgba(15,23,42,0.28)] lg:[transform:var(--slot-transform)] lg:[z-index:var(--slot-z)] lg:[backface-visibility:hidden] lg:transition-transform lg:duration-[900ms] lg:ease-[cubic-bezier(0.45,0,0.25,1)] lg:motion-reduce:transition-none`}
               style={{
                 ['--slot-transform' as string]: slotTransform(slot),
                 ['--slot-z' as string]: String(
@@ -280,17 +198,21 @@ export default function VerticalsSection() {
 
                 {/* Only the deck is clickable. Below lg this is display:none, so
                     it never reaches the accessibility tree there. The centred
-                    card is disabled rather than unlabelled: a button whose only
-                    content is aria-hidden artwork has no accessible name. */}
+                    card stays enabled and focusable on purpose: disabling it
+                    would drop focus on the floor the moment a keyboard user
+                    picked a card, because the button they just activated is the
+                    one that becomes centred. */}
                 <button
                   type="button"
                   onClick={() => goTo(index)}
-                  disabled={isCentred}
+                  aria-current={isCentred}
                   className={`hidden lg:block absolute inset-0 rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 ${
                     isCentred ? 'cursor-default' : 'cursor-pointer'
                   }`}
                 >
-                  <span className="sr-only">Show {card.title}</span>
+                  <span className="sr-only">
+                    {isCentred ? `Showing ${card.title}` : `Show ${card.title}`}
+                  </span>
                 </button>
               </div>
 
