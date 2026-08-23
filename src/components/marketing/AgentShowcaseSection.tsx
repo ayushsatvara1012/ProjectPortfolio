@@ -1,6 +1,27 @@
 import React from 'react';
 import Image from 'next/image';
 import VerticalsSection from './VerticalsSection';
+import ChatShowcaseArt from './showcase/ChatShowcaseArt';
+import CustomToolShowcaseArt from './showcase/CustomToolShowcaseArt';
+
+// Same split as the verticals cards: the gradient stays a bitmap because it is
+// pure smooth colour, and the UI over it stays vector so its text and hairlines
+// keep their edges at any resolution. unoptimized keeps Next from re-encoding an
+// already-minimal gradient. 18px matches the radius the verticals deck clips to.
+// The light shadow is slate at 28%, which is a tint of the page behind it and
+// so reads as nothing once that page goes dark. The dark pair keeps the same
+// geometry and swaps in near-black at a weight that still separates the frame
+// from the surface it sits on.
+const SHOWCASE_ART_FRAME =
+  'relative w-full aspect-[723/542] overflow-hidden rounded-[18px] shadow-[0_18px_50px_-12px_rgba(15,23,42,0.28)] dark:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.75)]';
+
+const SHOWCASE_SIZES =
+  '(min-width: 1280px) 658px, (min-width: 1024px) 55vw, calc(100vw - 3rem)';
+
+// The backdrops are mesh gradients lit for a light page. In dark mode they are
+// dimmed rather than veiled in black, so the gradient keeps its colour instead
+// of flattening toward grey, and the artwork stays the brightest thing here.
+const SHOWCASE_BACKDROP = 'object-cover dark:brightness-[.80]';
 
 export default function AgentShowcaseSection() {
   return (
@@ -28,16 +49,16 @@ export default function AgentShowcaseSection() {
 
             {/* Right Column: Clean Frame with the conversation illustration (spans ~60%) */}
             <div className="lg:col-span-7 w-full flex items-center justify-center">
-              <div className="relative w-full overflow-hidden flex items-center justify-center">
-                {/* SVG Illustration with no background and no drop shadow */}
+              <div className={SHOWCASE_ART_FRAME}>
                 <Image
-                  src="/Tools_Image2.webp"
+                  src="/Chat_Background.webp"
                   alt="Vaayu Generic Chatbot Customer Conversation"
-                  className="w-full h-auto block max-w-full"
-                  width={2169}
-                  height={1626}
-                  sizes="(min-width: 1280px) 658px, (min-width: 1024px) 55vw, calc(100vw - 3rem)"
+                  fill
+                  unoptimized
+                  sizes={SHOWCASE_SIZES}
+                  className={SHOWCASE_BACKDROP}
                 />
+                <ChatShowcaseArt />
               </div>
             </div>
           </div>
@@ -47,15 +68,16 @@ export default function AgentShowcaseSection() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
           {/* Left Column on Desktop (Image): Order 2 on Mobile, Order 1 on Desktop */}
           <div className="order-2 lg:order-1 lg:col-span-7 w-full flex items-center justify-center">
-            <div className="relative w-full overflow-hidden flex items-center justify-center">
+            <div className={SHOWCASE_ART_FRAME}>
               <Image
-                src="/Tools_Image.webp"
+                src="/CustomTool_Background.webp"
                 alt="Chemical Industry Chatbot Tools"
-                className="w-full h-auto block max-w-full"
-                width={2169}
-                height={1626}
-                sizes="(min-width: 1280px) 658px, (min-width: 1024px) 55vw, calc(100vw - 3rem)"
+                fill
+                unoptimized
+                sizes={SHOWCASE_SIZES}
+                className={SHOWCASE_BACKDROP}
               />
+              <CustomToolShowcaseArt />
             </div>
           </div>
 
