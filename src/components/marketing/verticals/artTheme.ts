@@ -15,19 +15,19 @@ export const ART = {
   // field and pills, which pair a fill with their own border.
   surface: 'dark:fill-slate-800',
   field: 'dark:fill-slate-800 dark:stroke-slate-600',
-  pill: 'dark:fill-slate-800 dark:stroke-indigo-400',
+  pill: 'dark:fill-slate-800 dark:stroke-blue-400',
 
   // The header strip across a result card. It carries white label text in both
   // themes, so it has to stay dark enough to keep that legible while still
   // separating from the surface underneath.
-  band: 'dark:fill-indigo-600',
+  band: 'dark:fill-blue-600',
 
   // Accent-coloured labels and glyphs - the Open/Download actions - which sit
   // on a surface and so have to invert with it.
-  accent: 'dark:fill-indigo-300',
+  accent: 'dark:fill-blue-300',
 
   // The COA request button, the one accent-filled control.
-  action: 'dark:fill-indigo-600 dark:stroke-indigo-400',
+  action: 'dark:fill-blue-600 dark:stroke-blue-400',
 
   textPrimary: 'dark:fill-slate-100',
   textMuted: 'dark:fill-slate-400',
