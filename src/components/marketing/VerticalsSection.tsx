@@ -194,6 +194,7 @@ export default function VerticalsSection() {
                   sizes={CARD_SIZES}
                   className="object-cover"
                 />
+                <div className="absolute inset-0 bg-black opacity-0 dark:opacity-50" aria-hidden="true" />
                 <card.Art />
 
                 {/* Only the deck is clickable. Below lg this is display:none, so
