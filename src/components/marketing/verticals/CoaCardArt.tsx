@@ -1,4 +1,4 @@
-import { ART } from './artTheme';
+import { ART } from '../artTheme';
 
 // Generated from the Figma export "COA Card UI". Text is live <text>, so it
 // renders in the page's Plus Jakarta Sans and stays sharp at every resolution.
