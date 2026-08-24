@@ -17,13 +17,13 @@ export default function HeroSection({ hideHorizon = false, hideWash = false }: H
 
       {/* Background image behind terrain */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 hidden sm:block bg-cover bg-center opacity-90 dark:opacity-50"
+        className="pointer-events-none absolute inset-0 z-0 hidden sm:block bg-cover bg-center opacity-90 dark:opacity-25"
         style={{ backgroundImage: "url('/hero_coloredBG.webp')" }}
         aria-hidden="true"
       />
       {/* Dark layer over background image for dark theme */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 hidden sm:dark:block bg-black/60"
+        className="pointer-events-none absolute inset-0 z-0 hidden sm:dark:block bg-black/85"
         aria-hidden="true"
       />
 

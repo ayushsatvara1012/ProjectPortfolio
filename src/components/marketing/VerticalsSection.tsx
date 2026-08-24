@@ -135,7 +135,14 @@ export default function VerticalsSection() {
   const total = CHEMICAL_CARDS.length;
 
   return (
-    <div className="w-full pt-8 sm:pt-12">
+    <div
+      className="w-full pt-8 sm:pt-12"
+      style={{
+        ['--cw' as string]: CARD_WIDTH,
+        ['--ch' as string]: `calc(${CARD_ASPECT} * var(--cw))`,
+        ['--rail-h' as string]: String(RAIL_H),
+      }}
+    >
       <h3 className="text-center lg:text-left font-google font-semibold tracking-tight lg:leading-[1.1] text-3xl sm:text-4xl xl:text-[2.5rem] text-slate-900 dark:text-white">
         {SECTION_TITLE}
       </h3>
@@ -161,11 +168,6 @@ export default function VerticalsSection() {
           collided. */}
       <div
         className="group mt-10 sm:mt-14 lg:mt-10 grid grid-cols-1 gap-6 lg:block lg:relative lg:overflow-hidden lg:w-screen lg:ml-[calc(50%-50vw)] lg:h-[calc(var(--rail-h)*var(--ch))] lg:[container-type:inline-size]"
-        style={{
-          ['--cw' as string]: CARD_WIDTH,
-          ['--ch' as string]: `calc(${CARD_ASPECT} * var(--cw))`,
-          ['--rail-h' as string]: String(RAIL_H),
-        }}
       >
         {CHEMICAL_CARDS.map((card, index) => {
           const slot = signedOffset((index - active + total) % total, total);
@@ -230,6 +232,37 @@ export default function VerticalsSection() {
                 </p>
               </div>
             </article>
+          );
+        })}
+      </div>
+
+      {/* The deck gives no outward sign that the flanking cards respond to a
+          click. These sit under it as that affordance, and are real controls
+          rather than a painted hint - the same goTo the cards call. Below lg
+          there is no deck, so they go with it. Derived from the card list, not
+          a fixed three, for the same reason the slot geometry is. */}
+      <div className="hidden lg:flex justify-center items-center gap-1 lg:mt-[calc(-0.07*var(--ch))]">
+        {CHEMICAL_CARDS.map((card, index) => {
+          const isCentred = index === active;
+          return (
+            <button
+              key={card.id}
+              type="button"
+              onClick={() => goTo(index)}
+              aria-current={isCentred}
+              className="p-2 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            >
+              <span
+                className={`block h-2.5 rounded-full transition-all duration-500 ease-out motion-reduce:transition-none ${
+                  isCentred
+                    ? 'w-8 bg-slate-800 dark:bg-white'
+                    : 'w-2.5 bg-slate-300 hover:bg-slate-400 dark:bg-slate-600 dark:hover:bg-slate-500'
+                }`}
+              />
+              <span className="sr-only">
+                {isCentred ? `Showing ${card.title}` : `Show ${card.title}`}
+              </span>
+            </button>
           );
         })}
       </div>

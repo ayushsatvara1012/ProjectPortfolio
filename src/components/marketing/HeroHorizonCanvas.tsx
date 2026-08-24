@@ -159,7 +159,7 @@ export default function HeroHorizonCanvas({ className = '' }: HeroHorizonCanvasP
           // Theme-adaptive facet fill
           const facetAlpha = Math.min(0.8, 0.32 + (28 - d00) / 65 + elevationShade * 0.15);
           ctx.fillStyle = isDark
-            ? `rgba(0, 0, 0, ${facetAlpha.toFixed(3)})`
+            ? '#000000'
             : `rgba(245, 249, 255, ${facetAlpha.toFixed(3)})`;
           ctx.fill();
 

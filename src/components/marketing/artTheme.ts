@@ -11,6 +11,11 @@ export const ART = {
   // element, so this is a tint rather than a solid.
   panel: 'dark:fill-slate-900',
 
+  // The concentric echo behind the chat panel. It is one step lighter than the
+  // panel it fans out from, so the rings stay readable as halos against a dark
+  // page instead of merging into the panel's own tone.
+  ripple: 'dark:fill-slate-700',
+
   // Raised surfaces on top of the panel: the result card body, and the search
   // field and pills, which pair a fill with their own border.
   surface: 'dark:fill-slate-800',

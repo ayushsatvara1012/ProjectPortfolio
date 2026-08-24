@@ -116,6 +116,15 @@ export function drawGalaxySky(
   timeSec: number = 0,
   isDark: boolean = true
 ) {
+  // Dark sky wash overlay for dark mode
+  if (isDark) {
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, fadeHeight ?? sky.height);
+    skyGrad.addColorStop(0, 'rgba(0, 0, 0, 0.65)');
+    skyGrad.addColorStop(1, 'rgba(0, 0, 0, 0.1)');
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, sky.width, fadeHeight ?? sky.height);
+  }
+
   // 1. NEBULAE WASH (Disabled/Empty per request)
   if (sky.nebulae.length > 0) {
     ctx.globalCompositeOperation = 'lighter';
