@@ -1,8 +1,8 @@
 # List answer consistency plan
 
-Status: DIAGNOSIS COMPLETE. D1 (lists of any length) BUILT, uncommitted. Everything else unstarted.
+Status: DIAGNOSIS COMPLETE. D1 + Phase 3 wiring BUILT and committed, NOT merged, NOT applied to prod. Phases 1, 2, 4, 5, 6 unstarted.
 Opened 2026-08-25 from three live Expresolv conversations on 2026-08-22.
-Branch: diagnosis done on `MainV2`; D1 built on `feature/list-atomic-chunking`, off `feature/entity-safe-ingestion`.
+Branch: `feature/list-atomic-chunking`, off `feature/entity-safe-ingestion`, with `MainV2` merged in (26 commits, none touching `main.py`, clean).
 
 ## 0. The incident
 
@@ -396,3 +396,40 @@ A list that fits in one parent is still packed whole, so the narrow case did not
 Deliberately NOT done: making `list` atomic.
 Atomic means never cut, which for a 600-item list means one enormous chunk.
 Divisible at item boundaries is the correct shape, and it is what tables already do.
+
+## 10. Phase 3 wiring built - 2026-08-25
+
+Commit `6a31951b`, on `feature/list-atomic-chunking`.
+Suite 2749 passed / 134 skipped. `npx eslint src public` 0 errors.
+NOT merged, NOT applied to any database.
+
+`MainV2` was merged into the branch first, since it had moved 26 commits ahead and carried migration 0038.
+None of those commits touch `main.py`, so the merge was clean and the suite stayed green.
+
+What landed:
+
+- `run_training_job` calls `chunking.split` instead of the two `RecursiveCharacterTextSplitter` passes.
+- Migration `0039` adds `company_knowledge.context`, additive and idempotent, no backfill.
+  NULL reads as "no context", which is exactly the pre-migration behaviour, so existing rows are unaffected.
+- The same additive column lands on tenant databases through `_build_schema_sql`, following the `word_count` precedent.
+- `word_count` still counts `content` alone, so no existing tenant's quota moves.
+- The child is embedded from `retrievable_text`, so the vector sees the label while the billed text does not.
+  Stored vector and billed text differ deliberately.
+- Retrieval rejoins context and content in SQL, in both the hybrid and the pure-vector branches.
+- BYOD's `(parent, child)` tuple became `byod_ingest.ChunkPair`, carrying both contexts.
+  Legacy 2-tuples still normalise, and dedup identity stays on child content alone, so a reworded heading does not re-embed an unchanged page.
+
+Tests added: three in `tests/test_training_chunking_wiring.py` driving a real `run_training_job` and capturing what reaches ingest, plus three in the BYOD ingest suite.
+The wiring test deliberately asserts on the seam rather than re-testing the chunker, which has its own suite.
+
+**Still required before any of this reaches a client, in this order:**
+
+1. Apply `0039` to the prod control DB, dark, then stamp - per the `migration-apply-dark` precedent. NOT DONE, and it is a production database change that needs the owner's go-ahead.
+2. Merge to `MainV2` via PR.
+3. Re-index Expresolv's `food additives at expresolv.pdf` specifically.
+   Their 2026-08-13 re-train covered URL sources only, so this will not happen incidentally.
+
+**One thing to watch on the first re-ingest, flagged not fixed.**
+Billed words fall when headers and lead-ins stop being billed per chunk ([[entity-safe-ingestion]] measured -14% on real pages).
+`replacement_shrink_reason` refuses an upsert that collapses a source to under a quarter of its stored words, so a 14% fall is comfortably inside the guard.
+It is worth re-checking on the first real re-index rather than assuming, because the guard fires on the billed number and that number is now defined differently.
