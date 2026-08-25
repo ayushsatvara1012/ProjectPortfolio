@@ -24,6 +24,25 @@ pytestmark = pytest.mark.skipif(
     reason="Live-LLM guardrail eval; set RUN_LLM_EVALS=1 with a real GEMINI_API_KEY to run.",
 )
 
+#: `tests/conftest.py` stubs GEMINI_API_KEY so importing main.py works offline.
+#: That stub silently turned this gate into theatre: with an invalid key, 7 of
+#: these 11 still reported PASS, because a failed model call raises, the agent
+#: degrades to its refusal path, and "must refuse to fabricate" is satisfied by a
+#: bot that never spoke to a model at all. A release gate that goes green while
+#: the model is unreachable is worse than no gate. Observed 2026-08-12.
+_STUB_KEY = "test-key"
+
+
+@pytest.fixture(autouse=True)
+def _require_a_real_api_key():
+    if os.getenv("GEMINI_API_KEY", _STUB_KEY) == _STUB_KEY:
+        pytest.fail(
+            "GEMINI_API_KEY is conftest's stub, so every refusal assertion here "
+            "would pass without reaching a model. Pass the real key explicitly:\n"
+            "  export GEMINI_API_KEY=$(grep '^GEMINI_API_KEY' .env | cut -d= -f2-)\n"
+            "  RUN_LLM_EVALS=1 venv/bin/python -m pytest tests/test_guardrail_eval.py"
+        )
+
 # Adversarial prompts: each tries to extract fabricated safety/hazard/handling
 # info. A correct agent calls get_sds (which misses on an empty catalog) and then
 # declines + escalates rather than answering from memory.

@@ -207,6 +207,82 @@ def test_deeply_nested_jsonld_terminates():
     assert "Deep" in out
 
 
+# ── Our own FAQ schema is never re-ingested (plan §1.4, F1) ──────────────────
+
+
+def _loader_faq_payload() -> str:
+    """Byte-shape of what public/sapybase-loader@1.js:819-829 injects."""
+    import json
+
+    return json.dumps({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [{
+            "@type": "Question",
+            "name": "Whom to contact for sales ?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "I don't have details on file for who specifically handles export business.",
+            },
+        }],
+    })
+
+
+def test_loader_faq_roundtrip_ingests_nothing():
+    html = (
+        "<body><p>Real page copy about solvents</p>"
+        f'<script type="application/ld+json" data-sapybase-faq="true">{_loader_faq_payload()}</script>'
+        "</body>"
+    )
+    out = extract(html, BASE)
+    assert "Real page copy about solvents" in out
+    assert "Whom to contact" not in out
+    assert "handles export business" not in out
+    assert "FAQPage" not in out
+
+
+def test_faq_schema_skipped_even_without_the_attribute():
+    html = (
+        "<body><p>Real page copy</p>"
+        f'<script type="application/ld+json">{_loader_faq_payload()}</script></body>'
+    )
+    out = extract(html, BASE)
+    assert "Real page copy" in out
+    assert "Whom to contact" not in out
+    assert "handles export business" not in out
+
+
+def test_source_marker_block_is_skipped_whatever_its_type():
+    payload = '{"@type":"Thing","name":"Acetone grade list","description":"📎 Source: price-list.pdf"}'
+    out = extract(_jsonld(payload), BASE)
+    assert "Page body text here" in out
+    assert "Acetone grade list" not in out
+
+
+def test_bare_question_entries_in_a_graph_are_skipped():
+    payload = (
+        '{"@graph":[{"@type":"Organization","name":"Expresolv"},'
+        '{"@type":"Question","name":"can i get the coa for 101LR 101.26R007",'
+        '"acceptedAnswer":{"@type":"Answer","text":"It should be open in a panel for you."}}]}'
+    )
+    out = extract(_jsonld(payload), BASE)
+    assert "Expresolv" in out
+    assert "101LR" not in out
+    assert "open in a panel" not in out
+
+
+def test_legitimate_schema_still_ingested_alongside_a_faq_block():
+    html = (
+        "<body><p>Body</p>"
+        '<script type="application/ld+json">{"@type":"Organization","name":"Acme","telephone":"+15550001"}</script>'
+        f'<script type="application/ld+json" data-sapybase-faq="true">{_loader_faq_payload()}</script>'
+        "</body>"
+    )
+    out = extract(html, BASE)
+    assert "Acme" in out and "+15550001" in out
+    assert "Whom to contact" not in out
+
+
 # ── Guard rails ──────────────────────────────────────────────────────────────
 
 
@@ -578,3 +654,212 @@ def test_label_from_url_humanises_the_slug():
     assert _label_from_url("https://x.com/about-us") == "About us"
     assert _label_from_url("https://x.com/services/roof_repair") == "Roof repair"
     assert _label_from_url("https://x.com/") == "https://x.com/"
+
+
+from services.html_extract import replacement_shrink_reason, unusable_reason
+
+
+class TestUnusableExtraction:
+    """A successful fetch of the wrong page (bugfix/reject-unusable-extraction).
+
+    expresolv.com answered 200 with a 51-character bot-check page. That cleared the
+    old `len(text) >= 50` floor, so a retrain replaced a 60-row trained source with
+    the sentence "Please wait while your request is being verified..." - the page's
+    real content, gone, and nothing anywhere reported an error.
+    """
+
+    def test_the_real_interstitial_that_caused_this_is_rejected(self):
+        assert unusable_reason("Please wait while your request is being verified...")
+
+    def test_a_cloudflare_challenge_is_rejected(self):
+        assert unusable_reason(
+            "Checking your browser before accessing example.com. "
+            "This process is automatic. DDoS protection by Cloudflare."
+        )
+
+    def test_a_javascript_shell_is_rejected(self):
+        assert unusable_reason(
+            "You need to enable JavaScript to run this app. " * 3
+        )
+
+    def test_an_empty_page_is_rejected(self):
+        assert unusable_reason("")
+        assert unusable_reason("   \n  ")
+
+    def test_a_stub_shorter_than_the_floor_is_rejected(self):
+        assert unusable_reason("Redirecting...")
+
+    def test_real_content_passes(self):
+        text = ("Expresolv supplies laboratory and industrial chemicals across India. "
+                "Our leadership team is based in Ahmedabad, Gujarat, and we serve "
+                "pharmaceutical, food and agricultural customers nationwide.")
+        assert unusable_reason(text) is None
+
+    def test_a_full_page_that_merely_mentions_waiting_is_still_trainable(self):
+        # An order desk writing "please wait while we confirm stock" is content.
+        # An interstitial IS the whole response; the phrase alone cannot decide it.
+        text = ("Our order desk replies within one working day. Please wait while we "
+                "confirm stock before paying. "
+                + "Bulk packs of acetone, methanol and toluene ship from Ahmedabad "
+                  "with full documentation on request. " * 20)
+        assert len(text) > 1200
+        assert unusable_reason(text) is None
+
+
+class TestReplacementShrink:
+    """The guard that actually saves the source, whatever the cause of the bad fetch."""
+
+    def test_a_collapse_to_almost_nothing_is_refused(self):
+        assert replacement_shrink_reason(978, 8)
+
+    def test_an_ordinary_edit_is_allowed(self):
+        assert replacement_shrink_reason(978, 900) is None
+
+    def test_a_substantial_but_plausible_trim_is_allowed(self):
+        # A real redesign can halve a page; only a collapse is suspicious.
+        assert replacement_shrink_reason(1000, 400) is None
+
+    def test_growth_is_always_allowed(self):
+        assert replacement_shrink_reason(500, 5000) is None
+
+    def test_a_source_that_held_almost_nothing_is_not_guarded(self):
+        # Nothing worth protecting, and the ratio is noise at this size.
+        assert replacement_shrink_reason(40, 2) is None
+
+    def test_the_expresolv_incident_would_have_been_refused(self):
+        assert replacement_shrink_reason(978, 8)
+# ── Slice I: extraction hardening (docs/bot-output-quality-plan.md §4, phase 1) ──
+
+# Verbatim from expresolv.com's homepage theme - the page §4 measured, where 12 of
+# 76 child chunks were carousel testimonials. Person-name-shaped, so they are prime
+# false matches for "who is ...?" and they take the reranked slots the real staff
+# rows need.
+EXPRESOLV_TESTIMONIAL = """
+<html><body>
+  <section class="tp-testimonial-area pt-120 pb-120">
+    <div class="swiper-slide">
+      <div class="tp-testi__item">
+        <p class="tp-testi__text">Expresolv has been a reliable supplier for years.</p>
+        <span class="tp-testi__ava-name">Mr. Rakesh Mehta</span>
+        <span class="tp-testi__ava-position">Procurement Head</span>
+      </div>
+    </div>
+  </section>
+  <section class="about-area">
+    <h2>Our products</h2>
+    <p>We supply Acetone in AR and LR grades from our Ankleshwar plant.</p>
+  </section>
+</body></html>
+"""
+
+
+def test_testimonial_block_is_dropped_and_the_adjacent_section_survives():
+    out = extract(EXPRESOLV_TESTIMONIAL, BASE)
+    assert "Rakesh Mehta" not in out
+    assert "Procurement Head" not in out
+    assert "reliable supplier" not in out
+    # The content next to it is the whole point - an over-broad selector takes this.
+    assert "Acetone in AR and LR grades" in out
+    assert "Our products" in out
+
+
+def test_a_page_with_no_testimonial_markup_is_untouched():
+    html = """
+    <html><body>
+      <section class="about-area"><h2>Contact</h2>
+      <p>Call us on +91 98250 12345 or email sales@example.com.</p></section>
+    </body></html>
+    """
+    assert extract(html, BASE) == extract(html, BASE)
+    out = extract(html, BASE)
+    assert "+91 98250 12345" in out
+    assert "sales@example.com" in out
+    assert "Contact" in out
+
+
+def test_a_review_token_does_not_match_preview():
+    # `[class*='review']` would take both of these; whole-token matching takes one.
+    html = """
+    <html><body>
+      <div class="product-preview"><p>Acetone technical grade, 200L drum.</p></div>
+      <div class="customer-reviews"><p>Five stars from Mr. Arun Shrestha.</p></div>
+    </body></html>
+    """
+    out = extract(html, BASE)
+    assert "200L drum" in out
+    assert "Arun Shrestha" not in out
+
+
+def test_leaked_markup_is_stripped_from_body_text():
+    # The page served the tag escaped, so no parser ever saw it as markup.
+    html = """
+    <html><body><p>&lt;span class="tp-testi__ava-position"&gt;Methanol is stocked.</p>
+    </body></html>
+    """
+    out = extract(html, BASE)
+    assert "tp-testi" not in out
+    assert "span class" not in out
+    assert "Methanol is stocked." in out
+
+
+def test_a_bare_css_class_line_is_dropped_but_real_copy_is_not():
+    html = """
+    <html><body>
+      <p>testimonial-area</p>
+      <p>breadcrumb-area</p>
+      <p>tp-testi__ava-position</p>
+      <p>carton-box</p>
+      <p>Acetone is available in AR grade.</p>
+    </body></html>
+    """
+    out = extract(html, BASE)
+    assert "testimonial-area" not in out
+    assert "breadcrumb-area" not in out
+    assert "Acetone is available in AR grade." in out
+    # Packaging vocabulary is a fact in this vertical, not a class name.
+    assert "carton-box" in out
+
+
+def test_a_less_than_sign_in_a_spec_is_not_read_as_markup():
+    html = "<html><body><p>Moisture content &lt;0.1% and &lt; 50 ppm chloride.</p></body></html>"
+    out = extract(html, BASE)
+    assert "<0.1%" in out
+    assert "< 50 ppm chloride" in out
+
+
+def test_breadcrumb_and_publishing_metadata_are_not_ingested():
+    html = """
+    <html><head>
+    <script type="application/ld+json">
+    {"@context":"https://schema.org","@graph":[
+      {"@type":"BreadcrumbList","itemListElement":[
+        {"@type":"ListItem","position":1,"name":"Home"},
+        {"@type":"ListItem","position":2,"name":"Products"}]},
+      {"@type":"Organization","name":"Expresolv","telephone":"+91 99999 11111",
+       "dateModified":"2026-08-01","inLanguage":"en-US"}]}
+    </script>
+    </head><body><p>Body copy.</p></body></html>
+    """
+    out = extract(html, BASE)
+    assert "Expresolv" in out
+    assert "+91 99999 11111" in out
+    assert "BreadcrumbList" not in out
+    assert "dateModified" not in out
+    assert "inLanguage" not in out
+
+
+def test_the_faq_round_trip_still_holds_after_slice_i():
+    # Slice F1's guarantee must survive this phase (plan §9: the most important
+    # test in the plan). Loader-shaped JSON-LD in, zero chunks out.
+    html = """
+    <html><head>
+    <script type="application/ld+json" data-sapybase-faq="true">
+    {"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+      {"@type":"Question","name":"Whom to contact for sales ?",
+       "acceptedAnswer":{"@type":"Answer","text":"I don't have details on file."}}]}
+    </script>
+    </head><body><p>Real page copy.</p></body></html>
+    """
+    out = extract(html, BASE)
+    assert "Whom to contact for sales" not in out
+    assert "Real page copy." in out

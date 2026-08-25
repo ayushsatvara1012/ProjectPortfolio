@@ -358,3 +358,55 @@ describe('Phase 3 hybrid — Chat/Home navigation', () => {
     expect(backArrowVisible(false, 'chat')).toBe(false); // generic bot: no nav arrow
   });
 });
+
+// Mirrors closePanels + its callers. Every one of these five surfaces replaces
+// the chat body, so one left open behind the Home screen must not survive the
+// next navigation — it would render over whatever the visitor opened instead
+// (tapping "Get a quote" and getting the spec panel, or the sample form).
+type Panels = { sample: boolean; sds: boolean; coa: boolean; spec: boolean };
+const NO_PANELS: Panels = { sample: false, sds: false, coa: false, spec: false };
+
+type CardTarget = 'tool' | 'chat' | 'form' | 'sds_picker' | 'coa_picker' | 'spec_picker';
+
+// closePanels() runs first for every target; only a panel/form target reopens one.
+function panelsAfterCardTap(_open: Panels, target: CardTarget): Panels {
+  switch (target) {
+    case 'form': return { ...NO_PANELS, sample: true };
+    case 'sds_picker': return { ...NO_PANELS, sds: true };
+    case 'coa_picker': return { ...NO_PANELS, coa: true };
+    case 'spec_picker': return { ...NO_PANELS, spec: true };
+    default: return { ...NO_PANELS };
+  }
+}
+
+// Mirrors startNewSession / resumeSession, which switch the thread under the panels.
+function panelsAfterSessionSwitch(_open: Panels): Panels {
+  return { ...NO_PANELS };
+}
+
+const ALL_OPEN: Panels = { sample: true, sds: true, coa: true, spec: true };
+
+describe('Phase 3 hub — one surface at a time', () => {
+  it('a tool card tap clears a panel left open behind Home', () => {
+    expect(panelsAfterCardTap({ ...NO_PANELS, spec: true }, 'tool')).toEqual(NO_PANELS);
+  });
+
+  it('a tool card tap clears the sample form too (the fifth surface)', () => {
+    expect(panelsAfterCardTap({ ...NO_PANELS, sample: true }, 'tool')).toEqual(NO_PANELS);
+  });
+
+  it('the chat card clears whatever was open', () => {
+    expect(panelsAfterCardTap(ALL_OPEN, 'chat')).toEqual(NO_PANELS);
+  });
+
+  it('each panel card opens its own surface, and only its own', () => {
+    expect(panelsAfterCardTap(ALL_OPEN, 'form')).toEqual({ ...NO_PANELS, sample: true });
+    expect(panelsAfterCardTap(ALL_OPEN, 'sds_picker')).toEqual({ ...NO_PANELS, sds: true });
+    expect(panelsAfterCardTap(ALL_OPEN, 'coa_picker')).toEqual({ ...NO_PANELS, coa: true });
+    expect(panelsAfterCardTap(ALL_OPEN, 'spec_picker')).toEqual({ ...NO_PANELS, spec: true });
+  });
+
+  it('starting or resuming a conversation never inherits an open surface', () => {
+    expect(panelsAfterSessionSwitch(ALL_OPEN)).toEqual(NO_PANELS);
+  });
+});

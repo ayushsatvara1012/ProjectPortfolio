@@ -26,9 +26,12 @@ from services import qualification, sales_funnel, session_store
 from services.lead_scoring import _score_lead
 
 from . import compose as compose_mod
+from . import contact as contact_mod
+from . import contract as contract_mod
 from . import escalation as escalation_mod
 from . import sources as sources_mod
 from .loop import AGENT_FALLBACK_TEXT, stream_agent_loop
+from .states import TurnState
 from .tools.records import insert_agent_request, session_has_capture
 from .turn import TurnEvent, TurnResult
 
@@ -44,6 +47,16 @@ CARD_KEYS = ("sds", "quote", "form", "grade_selector", "pack_selector", "coa",
 
 #: What gets replayed to the model as this turn's actions on the next turn.
 _ACTION_KEYS = CARD_KEYS + ("handoff",)
+
+#: The response-contract checks allowed to rewrite the reply
+#: (docs/bot-output-quality-plan.md §2.4a, owner decision 2026-08-12). Checks 1 and
+#: 2 enforce: measured at 27% of turns combined, repaired deterministically at no
+#: model cost, and untouched by the corpus cleanup that fixed everything else.
+#: Absent on purpose: ``ungrounded`` (check 3) reports until post-cleanup traffic
+#: sizes its false positives, and it is the only check that costs a re-invoke;
+#: ``extra_question`` (check 4) is a 1-in-98 defect and Slice J, which owns the
+#: licence it enforces, is deprioritised (§5).
+CONTRACT_ENFORCED = frozenset({"restatement", "denial_opener"})
 
 
 @dataclass
@@ -66,6 +79,10 @@ class TurnInputs:
     prior_lead_profile: Dict[str, Any] = field(default_factory=dict)
     retrieved_doc_count: int = 0
     kb_sources: List[Dict[str, Any]] = field(default_factory=list)
+    #: This turn's retrieved chunk TEXT, for the response contract's grounding
+    #: check (§2.4). Separate from ``kb_sources``, which is attribution only and
+    #: deliberately stores no content - see ``_build_kb_sources``.
+    retrieved_text: List[str] = field(default_factory=list)
 
     @property
     def company_id(self) -> Any:
@@ -113,10 +130,6 @@ async def run_agent_turn(
 
     text = sanitize(text)
 
-    # Slice A (agent-conversation-gaps plan §3): a visitor who types a phone/email
-    # mid-chat reaches nobody unless a tool already fired a handoff this turn.
-    _capture_volunteered_contact(inputs, captured, cursor)
-
     turn_sources = list(inputs.kb_sources) + sources_mod.tool_sources(captured)
 
     # ── SETTLE (Phase 5) ──────────────────────────────────────────────────────
@@ -136,6 +149,21 @@ async def run_agent_turn(
         system_error=timed_out or text == AGENT_FALLBACK_TEXT,
         small_talk=len(inputs.message.strip()) < 4,
     )
+
+    # Slice A (agent-conversation-gaps plan §3): a visitor who types a phone/email
+    # mid-chat reaches nobody unless a tool already fired a handoff this turn.
+    #
+    # Runs AFTER settle, per QF10 (audit B3): it used to fire before the turn's
+    # outcome existed, so nothing downstream could know the answer had failed. It
+    # is deliberately still unconditional - see `_capture_volunteered_contact`.
+    captured_contact = _capture_volunteered_contact(inputs, captured, cursor, turn=turn)
+
+    _review_contract(inputs, turn, captured, model_text=text)
+
+    # Slice K (plan §6): the acknowledgment is prompt-driven, so it can promise a
+    # follow-up that no `agent_requests` row will ever produce. Bind the words to
+    # the write. Runs after the contract so its repairs are already in the text.
+    _bind_contact_acknowledgement(inputs, turn, captured, captured_contact)
 
     for key in CARD_KEYS:
         payload = captured.get(key)
@@ -247,37 +275,141 @@ def _subject_product(captured: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _capture_volunteered_contact(inputs: TurnInputs, captured: Dict[str, Any], cursor) -> None:
+def _prior_assistant_text(prior_messages) -> str:
+    """The last thing we said to this visitor - what check 1 compares against."""
+    for entry in reversed(list(prior_messages or [])):
+        role = entry.get("role") if isinstance(entry, dict) else getattr(entry, "role", None)
+        if role in ("assistant", "bot"):
+            content = entry.get("content") if isinstance(entry, dict) else getattr(entry, "content", "")
+            return content or ""
+    return ""
+
+
+def _review_contract(inputs: TurnInputs, turn: TurnResult, captured: Dict[str, Any],
+                     *, model_text: str = "") -> None:
+    """Apply the response contract to the settled reply and log what it found.
+
+    Safe to rewrite here because the answer reaches the caller only on the single
+    ``result`` event below - nothing of it is on the visitor's screen yet. The
+    checks outside ``CONTRACT_ENFORCED`` still run and still log, which is how the
+    next one earns its promotion.
+
+    Failures are swallowed - a post-condition must never be able to take down a
+    live turn that the model already answered correctly.
+    """
+    try:
+        # ``settle`` may have replaced the model's words with a server-authored
+        # refusal. That text is ours, already correct by construction, and not what
+        # these checks were measured against - classify it, never rewrite it.
+        server_authored = turn.text != model_text
+
+        report = contract_mod.check(
+            turn.text,
+            prior_reply=_prior_assistant_text(inputs.prior_messages),
+            evidence=contract_mod.evidence_from(inputs.retrieved_text, captured),
+            # Slice J owns the licence; until it ships, assume the turn may ask one
+            # question, so check 4 reports only the stacked-offer case.
+            question_licensed=True,
+            pack_vocab=_pack_vocab(inputs.pack),
+            enforce=() if server_authored else CONTRACT_ENFORCED,
+        )
+        if report.changed:
+            turn.text = report.text
+        if report.findings:
+            logger.info(
+                "CONTRACT company=%s session=%s state=%s changed=%s reinvoke=%s %s",
+                inputs.company_id, inputs.session_id, turn.state.value,
+                report.changed, report.needs_reinvoke, report.summary(),
+            )
+    except Exception:
+        logger.exception("contract: review failed")
+
+
+def _pack_vocab(pack) -> tuple:
+    """Capitalised vertical vocabulary that is never a person's name."""
+    if pack is None:
+        return ()
+    names = []
+    for table in getattr(pack, "catalog_tables", ()) or ():
+        label = getattr(table, "label", None) or getattr(table, "name", None)
+        if label:
+            names.append(str(label))
+    return tuple(names)
+
+
+def _capture_volunteered_contact(inputs: TurnInputs, captured: Dict[str, Any], cursor,
+                                 *, turn: Optional[TurnResult] = None) -> bool:
     """Record a phone/email the visitor typed in passing (Slice A, §3).
 
     Opportunistic and best-effort: it never blocks the reply, and it yields to a
     handoff a tool already captured this turn (e.g. a priced quote) rather than
     overwriting it. Writing ``captured["handoff"]`` is what makes the caller's
     real-time owner ping fire unchanged.
+
+    Returns whether a row was written this turn, which is what Slice K binds the
+    acknowledgment sentence to.
+
+    **QF10, resolved the other way round.** The audit asked for the capture to be
+    suppressed when the turn's answer is a fallback. Suppressing it would delete a
+    real lead at exactly the moment a human is most needed - the bot just failed
+    and the visitor handed over their number anyway. So the capture still runs;
+    what the ordering fix buys is that the owner's alert can now SAY the turn
+    failed, instead of describing a conversation that never happened.
     """
     if not inputs.session_id or captured.get("handoff"):
-        return
+        return False
     try:
         contact = qualification.extract_contact(inputs.message)
     except Exception:
         contact = {}
     if not contact or session_has_capture(cursor, inputs.company_id, inputs.session_id):
-        return
+        return False
+    failed = turn is not None and turn.state in (TurnState.SYSTEM_ERROR, TurnState.NO_DATA)
+    note = f"[bot could not answer this turn] {inputs.message}" if failed else inputs.message
     product = _subject_product(captured) or (
         ((inputs.prior_state or {}).get("products") or [{}])[-1] or {}
     ).get("name")
     if insert_agent_request(
             cursor, inputs.company_id, kind="contact",
             product=product, cas=None, grade=None, pack_size=None, qty=None,
-            note=inputs.message, name=None, email=contact.get("email"),
+            note=note, name=None, email=contact.get("email"),
             phone=contact.get("phone"), session_id=inputs.session_id):
         captured["handoff"] = {
             "kind": "contact",
             "product": product,
             "contact_email": contact.get("email"),
             "contact_phone": contact.get("phone"),
-            "note": inputs.message,
+            "note": note,
         }
+        return True
+    return False
+
+
+def _bind_contact_acknowledgement(inputs: TurnInputs, turn: TurnResult,
+                                  captured: Dict[str, Any],
+                                  captured_contact: bool) -> None:
+    """Slice K: never claim a contact was noted when no row was written.
+
+    A tool-captured handoff (a priced quote carrying the buyer's email) counts as
+    capture just as much as the volunteered path does - the claim is true either
+    way, and only an untrue one is repaired. ``turn.is_escalating`` is deliberately
+    NOT the test: the escalate event is attached further down, so it is always
+    absent here.
+    """
+    try:
+        if captured_contact or captured.get("handoff"):
+            return
+        text, finding = contact_mod.bind_acknowledgement(
+            turn.text,
+            captured=False,
+            cue=qualification.has_contact_cue(inputs.message),
+        )
+        if finding:
+            turn.text = text
+            logger.info("CONTACT-ACK company=%s session=%s %s",
+                        inputs.company_id, inputs.session_id, finding)
+    except Exception:
+        logger.exception("contact ack binding failed")
 
 
 def _persist_session(inputs: TurnInputs, turn: TurnResult, captured: Dict[str, Any],

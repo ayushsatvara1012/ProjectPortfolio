@@ -211,6 +211,16 @@ _PHONE_RELAXED_RE = re.compile(r"(?<!\d)([6-9]\d{9})(?!\d)")
 _CONTACT_CONTEXT_WINDOW = 40
 
 
+def has_contact_cue(text: str) -> bool:
+    """Did the visitor explicitly signal they are handing over contact details?
+
+    Exposed so Slice K can tell "they gave a number we could not read" from "they
+    never gave one" without a second copy of the cue vocabulary drifting out of
+    step with the extractor's.
+    """
+    return bool(_PHONE_CONTACT_CUE.search(text or ""))
+
+
 def extract_phone(text: str) -> Optional[str]:
     """An Indian mobile number in free text, high precision, or ``None``.
 

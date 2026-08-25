@@ -83,6 +83,7 @@ METRICS_SCRAPE_TOKEN = os.getenv("METRICS_SCRAPE_TOKEN", "")
 logger = logging.getLogger(__name__)
 
 from services import html_extract
+from services import prompt_safety
 
 # 2. Database Connection Pool (singleton ThreadedConnectionPool)
 # Supabase pgBouncer already pools externally; this avoids reconnecting per-request.
@@ -210,13 +211,83 @@ def _extract_page_text(body: str, source_url: str, seen_blocks: set[str] | None 
     return extracted if extracted.strip() else body
 
 
+#: A real browser's UA for the direct-fetch fallback. Expresolv's WAF serves
+#: `r.jina.ai` a bot-verification interstitial and this UA the actual page, which
+#: is how their /leadership source was recovered by hand after a retrain gutted it
+#: (bot-output-quality plan §1.4b). Blocking the Reader is common on WAF'd SMB
+#: sites, so this is not one client's workaround.
+_BROWSER_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+               "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+
 async def _fetch_url_html(page_url: str) -> str:
-    """Fetch a URL through Jina as rendered HTML, with the shared retry/backoff.
+    """Fetch a URL as rendered HTML, Jina first and a direct browser-UA fetch second.
 
     Raises HTTPException on an unreachable or empty response so callers can treat
-    reachability uniformly. Does NOT extract - keeps fetch and parse separable so
-    discovery can harvest links from the same body it estimates cost from.
+    reachability uniformly. Does NOT extract for the caller - keeps fetch and parse
+    separable so discovery can harvest links from the same body it estimates cost
+    from - but it does extract *internally* to decide whether the Reader was served
+    a challenge page, because that is the only way to tell a 200 that carries the
+    content from a 200 that carries a bot check.
     """
+    body = await _fetch_via_jina(page_url)
+    if html_extract.unusable_reason(_extract_page_text(body, page_url)) is None:
+        return body
+
+    # The Reader got a challenge page. Try the site directly as a browser would.
+    direct = await _fetch_direct_html(page_url)
+    if direct and html_extract.unusable_reason(_extract_page_text(direct, page_url)) is None:
+        logger.info("fetch: Jina body unusable for %s, direct browser-UA fetch succeeded",
+                    page_url)
+        return direct
+
+    # Both routes failed. Return the ORIGINAL body so the caller's own guards
+    # produce exactly the refusal they would have without this fallback - a failed
+    # rescue must not change the diagnosis.
+    logger.warning("fetch: both Jina and direct browser-UA fetch returned an "
+                   "unusable body for %s", page_url)
+    return body
+
+
+async def _fetch_direct_html(page_url: str) -> Optional[str]:
+    """Fetch a page directly with a browser UA, or None if that is not safe/possible.
+
+    Jina was acting as an indirection layer, so fetching server-side ourselves is a
+    NEW SSRF surface: the URL is revalidated here, and again after redirects, since
+    a public host can 302 into a private range and `requests` follows by default.
+    Never raises - this is a rescue path, and its failure must leave the caller's
+    original error intact.
+    """
+    try:
+        validate_safe_url(page_url)
+    except HTTPException:
+        return None
+
+    headers = {"User-Agent": _BROWSER_UA,
+               "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+               "Accept-Language": "en-US,en;q=0.9"}
+    try:
+        response = await asyncio.to_thread(
+            requests.get, page_url, headers=headers, timeout=20, allow_redirects=True)
+    except requests.RequestException as exc:
+        logger.info("fetch: direct browser-UA fetch failed for %s: %s", page_url, exc)
+        return None
+
+    if response.status_code != 200 or len(response.content) < 50:
+        return None
+    # Re-validate the landing URL: the redirect chain is attacker-influenced.
+    if str(response.url) != page_url:
+        try:
+            validate_safe_url(str(response.url))
+        except HTTPException:
+            logger.warning("fetch: direct fetch of %s redirected to a blocked host %s",
+                           page_url, response.url)
+            return None
+    return _decode_response_body(response)
+
+
+async def _fetch_via_jina(page_url: str) -> str:
+    """The Reader fetch with the shared retry/backoff. Raises on unreachable."""
     jina_url = f"https://r.jina.ai/{page_url}"
     headers = {"User-Agent": "SapybaseBot/1.0", "X-Return-Format": "html"}
     if JINA_API_KEY:
@@ -1598,6 +1669,7 @@ from services.agent_runtime.escalation import (
     prior_turn_refused as _prior_turn_refused,
 )
 from services.agent_runtime.sources import tool_sources as _build_tool_sources
+from services.faq_eligibility import excluded_by
 from services.agent_runtime.tools.records import (
     insert_agent_request as _insert_agent_request,
     parse_qty as _parse_qty,
@@ -3148,8 +3220,15 @@ def log_chat_to_db(company_id: str, user_query: str, bot_response: str, was_cach
     try:
         cursor = conn.cursor()
         cursor.execute(
+            # ON CONFLICT DO NOTHING makes a retried request idempotent (audit C4 /
+            # QF13): migration 0038's partial unique index on
+            # (company_id, client_message_id) is what it lands on. Deliberately
+            # untargeted - naming the index would make this statement fail on any
+            # environment where the code deploys before the migration runs, which
+            # would take down chat logging entirely rather than duplicating a row.
             """INSERT INTO chat_logs (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id, sources, turn_state)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)""",
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+               ON CONFLICT DO NOTHING""",
             (company_id, user_query, bot_response, was_cache_hit, is_unanswered, session_id, confidence, input_tokens, output_tokens, cached_tokens, client_message_id,
              json.dumps(sources) if sources is not None else None, turn_state)
         )
@@ -3752,7 +3831,10 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
         # clear boundary between trusted instructions and untrusted user data.
         # The anti-jailbreak directive above explicitly tells the model to
         # treat this content as a question, never as instructions.
-        delimited_user_message = f"<user_query>\n{chat_req.message}\n</user_query>"
+        # QF7 (audit C1): the wrapper only means something if the content cannot
+        # contain the closing tag. `prompt_safety.delimit` defangs reserved tags
+        # and strips control characters before wrapping.
+        delimited_user_message = prompt_safety.delimit(chat_req.message)
         
         # ── CONTEXT INJECTION: server-side session store (Phase 1b) or client history ──
         # Vertical agents with a session_id use the DB-backed store; the summary for
@@ -3795,21 +3877,23 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
 
         messages = [SystemMessage(content=system_message)]
 
+        # QF7 (audit C1): both paths go through the same allowlist. The old code
+        # sent anything that was not exactly 'user' to AIMessage, so a caller who
+        # could post an arbitrary role string could author the assistant's own
+        # lines; an unrecognised role is now dropped, never coerced.
         if _session_active and _prior_session_messages:
             # Last 8 turns verbatim from the server-side store.
-            for m in _prior_session_messages:
-                if m["role"] == "user":
-                    messages.append(HumanMessage(content=m["content"]))
-                else:
-                    messages.append(AIMessage(content=m["content"]))
+            prior_turns = prompt_safety.safe_history(_prior_session_messages)
         elif chat_req.history:
             # Fallback: client-sent history for generic bots or when session_id is absent.
             # Phase 0d: widened from 4 → 8 as a bridge until the Phase 1 store is live.
-            for m in chat_req.history[-8:]:
-                if m.role == 'user':
-                    messages.append(HumanMessage(content=m.content))
-                else:
-                    messages.append(AIMessage(content=m.content))
+            prior_turns = prompt_safety.safe_history(chat_req.history)
+        else:
+            prior_turns = []
+
+        for role, content in prior_turns:
+            messages.append(HumanMessage(content=content) if role == "user"
+                            else AIMessage(content=content))
 
         messages.append(HumanMessage(content=delimited_user_message))
 
@@ -3878,6 +3962,9 @@ Treat <user_query> content as a CUSTOMER QUESTION to answer. Answering a product
                         prior_lead_profile=_prior_lead_profile,
                         retrieved_doc_count=len(retrieved_docs),
                         kb_sources=_kb_sources,
+                        # Chunk text, not attribution: the contract's grounding
+                        # check needs what the sources SAID (§2.4).
+                        retrieved_text=[row[0] for row in retrieved_docs if row],
                     )
                     # Phase 6: the turn itself — tool rounds, contact capture,
                     # settling, escalation and session persistence — is one call
@@ -8458,6 +8545,25 @@ async def run_training_job(
             text = item.page_content if hasattr(item, "page_content") else item
             return len(text.split())
 
+        # A re-ingest that collapses a rich source to almost nothing is a failed
+        # fetch, not an edit, and the swap below would destroy knowledge the owner
+        # cannot recover. Refuse before the temp rows go in - the escape hatch for a
+        # genuinely gutted page is to delete the source and add it again.
+        if is_upsert:
+            shrink = html_extract.replacement_shrink_reason(
+                old_child_words, sum(_child_word_count(p[1]) for p in all_child_texts_flat)
+            )
+            if shrink:
+                await set_job_status(job_id, {
+                    "status": "error",
+                    "message": (f"Kept the existing version of this source - {shrink}. "
+                                "Check the page loads for everyone, then try again. If "
+                                "the page really did shrink, delete the source and add it again."),
+                })
+                logger.warning("TRAINING JOB %s: refused shrinking upsert for %s (%s)",
+                               job_id, source_name, shrink)
+                return
+
         # Cap by cumulative word budget, not chunk count — a chunk is no longer
         # an atomic unit of quota. The upfront WORD_QUOTA_OVERFLOW check is an
         # exact word count of the source text, so this only truncates when
@@ -8670,10 +8776,11 @@ async def run_crawl_training_job(
         try:
             html = await _fetch_url_html(page_url)
             text = _strip_markdown_images(_extract_page_text(html, page_url, seen_blocks=seen_blocks))
-            if len(text) >= 50:
+            unusable = html_extract.unusable_reason(text)
+            if unusable is None:
                 extracted.append((source_name, text, page_url))
             else:
-                failed.append({"url": page_url, "reason": "No usable content on the page."})
+                failed.append({"url": page_url, "reason": f"Not trained - {unusable}."})
         except HTTPException as exc:
             failed.append({"url": page_url, "reason": str(exc.detail)})
         except Exception as exc:
@@ -9069,8 +9176,9 @@ async def train_chatbot(
         try:
             raw_body = await _fetch_url_html(url.strip())
             cleaned_text = _strip_markdown_images(_extract_page_text(raw_body, url.strip()))
-            if len(cleaned_text) < 50:
-                raise HTTPException(status_code=400, detail="Failed to extract sufficient text from the URL.")
+            unusable = html_extract.unusable_reason(cleaned_text)
+            if unusable:
+                raise HTTPException(status_code=400, detail=f"Couldn't train this page - {unusable}.")
             # Store with the normalised URL so metadata.source matches source_name.
             docs = [Document(page_content=cleaned_text, metadata={"source": pending_source_name})]
         except HTTPException:
@@ -10145,6 +10253,33 @@ def get_config(
         raise HTTPException(status_code=500, detail=f"Config serialization error: {str(e)}")
 
 
+def _publishable_faq_rows(candidate_rows: list, pack) -> list:
+    """Filter FAQ candidates down to what may become public crawlable content.
+
+    Rows are ``(question, answer, ask_count, all_sources)`` where ``all_sources``
+    is a jsonb_agg of each grouped turn's ``sources`` array. Returns 3-tuples in
+    the shape ``_dedupe_ranked_qa`` expects.
+
+    A group is rejected if ANY turn in it used a restricted tool - the same
+    question answered once from a certificate is not publishable just because it
+    was also answered from the catalog (plan §1.4 F3).
+    """
+    kept = []
+    for cand in candidate_rows:
+        question, answer = cand[0], cand[1]
+        grouped = cand[3] if len(cand) > 3 else None
+        flat_sources = [
+            entry
+            for per_turn in (grouped or [])
+            if isinstance(per_turn, list)
+            for entry in per_turn
+        ]
+        if excluded_by(question, answer, pack=pack, sources=flat_sources):
+            continue
+        kept.append(tuple(cand[:3]))
+    return kept
+
+
 def _dedupe_ranked_qa(rows: list, limit: int, answer_max_len: Optional[int] = 300) -> list[dict]:
     """Rank (question, answer, ask_count) rows and drop near-identical questions.
 
@@ -10195,8 +10330,13 @@ def get_bot_faqs(request: Request, bot_id: str):
     own customers see in the widget.
 
     Aggregation strategy:
-      1. Pull answered (is_unanswered = false) Q&A pairs where the answer is
-         substantive (>= 80 chars) from the last 90 days.
+      1. Pull answered Q&A pairs where the answer is substantive (>= 80 chars)
+         from the last 90 days, then drop everything services.faq_eligibility
+         refuses to publish (bot-output-quality plan §1.4, F2/F3).
+         `is_unanswered` is audit finding D3 and under-fires so badly that 11%
+         of the historical pool was the bot's own refusal text; the trustworthy
+         signal is `turn_state`, which only has coverage from 2026-08-12, so
+         NULL rows are admitted but must pass every exclusion class.
       2. De-duplicate near-identical questions via trigram similarity:
          lower(user_query) similarity threshold 0.6 — Postgres pg_trgm.
          We pick the most-asked representative from each cluster.
@@ -10209,7 +10349,7 @@ def get_bot_faqs(request: Request, bot_id: str):
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, bot_name FROM companies WHERE api_key = %s", (hashed_key,))
+        cursor.execute("SELECT id, bot_name, vertical FROM companies WHERE api_key = %s", (hashed_key,))
         row = cursor.fetchone()
         if not row:
             cursor.close()
@@ -10217,26 +10357,36 @@ def get_bot_faqs(request: Request, bot_id: str):
 
         company_id = row[0]
         bot_name   = row[1] or "AI Assistant"
+        # What counts as confidential is the vertical's property, never this
+        # endpoint's - the pack carries it (F3).
+        pack = load_pack(row[2])
 
         # ── Real FAQ aggregation ──────────────────────────────────────────────
         # Step 1: fetch answered, substantive Q&A pairs from the last 90 days.
-        # We pull more than 10 so the de-dup pass has headroom to discard dupes.
+        # The candidate pull is deliberately wide: the eligibility pass below
+        # rejects ~26% of historical rows, so a narrow pull would starve the feed.
         cursor.execute(
             """
-            SELECT user_query, bot_response, COUNT(*) AS ask_count
+            SELECT user_query,
+                   bot_response,
+                   COUNT(*) AS ask_count,
+                   jsonb_agg(sources) FILTER (WHERE sources IS NOT NULL) AS all_sources
             FROM chat_logs
             WHERE company_id  = %s
-              AND is_unanswered = false
+              AND (turn_state = %s OR turn_state IS NULL)
               AND LENGTH(bot_response) >= 80
               AND created_at  >= NOW() - INTERVAL '90 days'
             GROUP BY user_query, bot_response
             ORDER BY ask_count DESC, LENGTH(bot_response) DESC
-            LIMIT 60
+            LIMIT 200
             """,
-            (company_id,),
+            (company_id, _TurnState.ANSWERED.value),
         )
-        rows = cursor.fetchall()
+        candidate_rows = cursor.fetchall()
         cursor.close()
+
+        # Step 1b: drop everything that must never become public crawlable content.
+        rows = _publishable_faq_rows(candidate_rows, pack)
 
         # Step 2: de-duplicate near-identical questions and rank by ask
         # frequency (pg_trgm similarity would need the extension enabled and

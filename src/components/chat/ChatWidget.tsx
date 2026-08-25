@@ -571,7 +571,7 @@ const MD_COMPONENTS = {
     <p {...props} className="first:mt-0 last:mb-0 mb-2">{children}</p>
   ),
   pre: ({ children, ...props }: React.ComponentPropsWithoutRef<'pre'>) => (
-    <div className="overflow-x-auto rounded-lg my-2 scrollbar-thin">
+    <div className="overflow-x-auto rounded-lg my-2 scrollbar-thin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <pre {...props}>{children}</pre>
     </div>
   ),
@@ -1100,14 +1100,14 @@ function SampleForm({ schema, products, prefill, themeColor, submitting, error, 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
-        <button type="button" onClick={onCancel} aria-label="Back"
+        <button type="button" onClick={onCancel} aria-label="Back to chat" title="Back to chat"
           className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
-          <MIcon name="arrow_back" className="text-[18px] leading-none" />
+          <MIcon name="chat_bubble" className="text-[17px] leading-none" />
         </button>
         <span className="text-[14px] font-google font-semibold text-slate-800 dark:text-slate-100">Request a sample</span>
       </div>
 
-      <form onSubmit={submit} className="flex-1 overflow-y-auto px-3.5 py-3 flex flex-col gap-3 scrollbar-thin">
+      <form onSubmit={submit} className="flex-1 overflow-y-auto px-3.5 py-3 flex flex-col gap-3 scrollbar-thin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* Honeypot (anti-spam): hidden from humans, only bots auto-fill it. The
             backend drops any submission where `website` is non-empty. */}
         <input
@@ -1135,7 +1135,7 @@ function SampleForm({ schema, products, prefill, themeColor, submitting, error, 
                   placeholder={f.placeholder || 'Search products…'}
                   className={`${baseInput} ${fieldBorder(f.name, f.required)}`} />
                 {showPicker && matches.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg scrollbar-thin z-20">
+                  <div className="absolute top-full left-0 right-0 mt-1 max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg scrollbar-thin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden z-20">
                     {matches.map((p, i) => (
                       <button key={`${p.name}-${p.cas_number || ''}-${i}`} type="button" onClick={() => pickProduct(p)}
                         className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
@@ -1205,9 +1205,9 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
-        <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back'}
+        <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back to chat'} title="Back to chat"
           className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors shrink-0">
-          <MIcon name="arrow_back" className="text-[18px] leading-none" />
+          <MIcon name="chat_bubble" className="text-[17px] leading-none" />
           {/* Only the chat-typed entry point interrupted an in-progress chat
               turn, so only it gets the explicit "back to chat" affordance —
               the hub-card entry keeps the plain icon-only back it always had. */}
@@ -1262,7 +1262,7 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12 text-slate-400 dark:text-slate-500 text-sm font-google">
             Loading products…
@@ -1352,9 +1352,9 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
-        <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back'}
+        <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back to chat'} title="Back to chat"
           className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors shrink-0">
-          <MIcon name="arrow_back" className="text-[18px] leading-none" />
+          <MIcon name="chat_bubble" className="text-[17px] leading-none" />
           {fromChat && <span className="text-[13px] font-google font-semibold">Back to chat</span>}
         </button>
         <span className="text-[13.5px] font-google font-bold text-slate-800 dark:text-slate-100 truncate">
@@ -1395,7 +1395,7 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
         </div>
       </form>
 
-      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {state === 'unconfigured' ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
             <span className="text-[13px] font-google text-slate-400 dark:text-slate-500 leading-relaxed">
@@ -1518,9 +1518,9 @@ export function SpecPicker({ rows, pinned, searching, configured, error, query, 
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
-        <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back'}
+        <button type="button" onClick={onCancel} aria-label={fromChat ? undefined : 'Back to chat'} title="Back to chat"
           className="flex items-center gap-1 -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors shrink-0">
-          <MIcon name="arrow_back" className="text-[18px] leading-none" />
+          <MIcon name="chat_bubble" className="text-[17px] leading-none" />
           {fromChat && <span className="text-[13px] font-google font-semibold">Back to chat</span>}
         </button>
         <div className="relative flex-1 min-w-0 flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
@@ -1580,7 +1580,7 @@ export function SpecPicker({ rows, pinned, searching, configured, error, query, 
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {state === 'unconfigured' ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center px-4">
             <span className="text-[13px] font-google text-slate-400 dark:text-slate-500 leading-relaxed">
@@ -2179,6 +2179,10 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // slot mini-form. Submitting the form fills {value} into the card's template
   // and sends it — driving the existing agent loop to the card's tool.
   const handleHubCardTap = (card: HubCard) => {
+    // A panel left open behind the Home screen would render over whatever this
+    // card opens next (a quote tap showing the spec panel), so every card tap
+    // starts from a clean chat body — the panel cases below reopen their own.
+    closePanels();
     // D10: a "*_picker" card only takes the deterministic-panel path while its
     // config-registry flag is on. With the flag off — which for COA means this bot
     // has no Drive folder — hubCardTarget returns "tool" and the card degrades to
@@ -2216,13 +2220,21 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setHubInput('');
   };
 
+  // Every surface that replaces the chat body. The sample form belongs here with
+  // the three pickers: it is gated the same way, so leaving it open behind Home
+  // or a session switch puts it in front of whatever the visitor opened next.
+  const closePanels = () => {
+    setSampleFormOpen(false);
+    setSdsPickerOpen(false);
+    setCoaPickerOpen(false);
+    setSpecPickerOpen(false);
+  };
+
   // Open the structured sample form (from a hub card or an agent {form} action),
   // optionally prefilled with the product/grade the visitor mentioned in chat.
   const openSampleForm = (prefill: Record<string, string>) => {
     setActiveHubCard(null);
-    setSdsPickerOpen(false);
-    setCoaPickerOpen(false);
-    setSpecPickerOpen(false);
+    closePanels();
     setHubView('chat');
     setSampleError(null);
     setSampleFormPrefill(prefill || {});
@@ -2300,9 +2312,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // exclusive with the sample form / mini-form panels.
   const openSdsPicker = () => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setCoaPickerOpen(false);   // H12 — only one panel ever replaces the chat body
-    setSpecPickerOpen(false);  // §10.2 — the fourth participant
+    closePanels();  // H12 / §10.2 — only one surface ever replaces the chat body
     setHubView('chat');
     setSdsQuery('');
     setSdsSearchResults(null);
@@ -2320,9 +2330,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // handling of a free-text {form} action).
   const openSdsPickerWithResult = (sds: SdsResult) => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setCoaPickerOpen(false);   // H12
-    setSpecPickerOpen(false);  // §10.2
+    closePanels();
     setHubView('chat');
     setSdsQuery(sds.product || '');
     setSdsSearchResults(null);
@@ -2381,9 +2389,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // visitor, not to the panel, so closing and reopening must not clear it.
   const openCoaPicker = () => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setSdsPickerOpen(false);
-    setSpecPickerOpen(false);  // §10.2
+    closePanels();
     setHubView('chat');
     setCoaQuery('');
     setCoaResult(null);
@@ -2403,9 +2409,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // passed it, which reads as the tail of a question in a text box.
   const openCoaPickerWithResult = (row: CoaRow) => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setSdsPickerOpen(false);
-    setSpecPickerOpen(false);  // §10.2
+    closePanels();
     setHubView('chat');
     setCoaQuery('');
     setCoaResult(row);
@@ -2420,9 +2424,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // ever replaces the chat body, and this is its fourth participant.
   const openSpecPicker = () => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setSdsPickerOpen(false);
-    setCoaPickerOpen(false);
+    closePanels();
     setHubView('chat');
     setSpecQuery('');
     setSpecRows([]);
@@ -2443,9 +2445,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // clean search term, where the COA tool's slot holds whatever the model passed it.
   const openSpecPickerWithResults = (event: SpecDocEvent) => {
     setActiveHubCard(null);
-    setSampleFormOpen(false);
-    setSdsPickerOpen(false);
-    setCoaPickerOpen(false);
+    closePanels();
     setHubView('chat');
     setSpecQuery(event.query);
     setSpecRows(event.rows);
@@ -2671,6 +2671,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (hasHub) setHubView('home');
     setActiveHubCard(null);
     setReopenableHubCard(null);
+    closePanels();
     setClearCount(c => c + 1);
   };
 
@@ -2682,6 +2683,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     if (hasHub) setHubView('chat');
     setActiveHubCard(null);
     setReopenableHubCard(null);
+    closePanels();
     animatedMsgIndices.current.clear();
     // Reset per-conversation gates so the resumed thread doesn't inherit the prior
     // view's lead-capture / handoff state. The fresh greeting shows until rows load.
@@ -3264,11 +3266,11 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 <div className="relative flex flex-row justify-between items-center w-full" ref={menuRef}>
                   <div className="relative flex items-center gap-2 pl-1">
                     {hasHub && hubView === 'chat' && view === 'chat' && (
-                      // Top-nav back arrow → Home screen (only for vertical bots in chat view).
-                      <button onClick={() => { setActiveHubCard(null); setReopenableHubCard(null); setHubView('home'); }}
+                      // Top-nav button → Home screen (only for vertical bots in chat view).
+                      <button onClick={() => { setActiveHubCard(null); setReopenableHubCard(null); closePanels(); setHubView('home'); }}
                         style={{ WebkitTapHighlightColor: 'transparent', outlineColor: THEME_COLOR }}
-                        className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="Go to home">
-                        <MIcon name="arrow_back" className="text-[22px] leading-none text-slate-500 dark:text-slate-400" />
+                        className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2" aria-label="Go to home" title="Go to home">
+                        <MIcon name="home" className="text-[20px] leading-none text-slate-500 dark:text-slate-400" />
                       </button>
                     )}
                     <div className="relative">
@@ -3771,12 +3773,17 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       Chat
                     </button>
                   </div>
-                  {!configData.white_label_enabled && (
+                  {!configData.white_label_enabled ? (
                     <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
                       className="flex items-center justify-center gap-1.5 mt-2.5 mb-2 text-[10px] font-sans font-normal tracking-wide text-slate-600 dark:text-slate-300">
                       <Image src={BrandLogo} alt="Vaayu" width={18} height={12} className="opacity-100" />
                       Vaayu Intelligence
                     </a>
+                  ) : (
+                    <div className="flex items-center justify-center gap-1.5 mt-2.5 mb-2 text-[10px] font-sans font-normal tracking-wide invisible pointer-events-none select-none" aria-hidden="true">
+                      <span className="w-[18px] h-[12px]" />
+                      Vaayu Intelligence
+                    </div>
                   )}
                 </div>
               </div>
@@ -3809,15 +3816,15 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                     <div className="flex flex-col gap-2">
                       {/* Back sits at the top so the visitor can return to asking;
                         below it is the single required field (no duplicate input). */}
-                      <button type="button" onClick={() => setActiveHubCard(null)} aria-label="Back to options"
+                      <button type="button" onClick={() => setActiveHubCard(null)} aria-label="Back to chat" title="Back to chat"
                         className="flex items-center gap-1 self-start -ml-1 px-1.5 py-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60 transition-colors">
-                        <MIcon name="arrow_back" className="text-[18px] leading-none" />
-                        <span className="text-[13px] font-medium font-google">Back</span>
+                        <MIcon name="chat_bubble" className="text-[17px] leading-none" />
+                        <span className="text-[13px] font-medium font-google">Back to chat</span>
                       </button>
                       <div className="relative">
                         {activeHubCard.input_source === 'products' && hubProductMatches.length > 0 && (
                           // Drop-UP (input sits near the bottom): the searchable catalog.
-                          <div className="absolute bottom-full left-0 right-0 mb-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg scrollbar-thin z-20">
+                          <div className="absolute bottom-full left-0 right-0 mb-1.5 max-h-44 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg scrollbar-thin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden z-20">
                             {hubProductMatches.map((p, i) => (
                               <button key={`${p.name}-${p.cas_number || ''}-${i}`} type="button" onClick={() => submitHubValue(p.name)}
                                 className="w-full text-left px-3 py-2 flex items-center justify-between gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
@@ -3850,7 +3857,7 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       </div>
                     </div>
                   ) : (
-                    <form onSubmit={handleSend} className={`relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-300 dark:border-slate-600 ${reopenableHubCard ? 'pl-2.5' : 'pl-4'} pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500`}>
+                    <form onSubmit={handleSend} className={`relative flex items-center gap-1.5 rounded-full bg-transparent border border-slate-200 dark:border-slate-700 ${reopenableHubCard ? 'pl-2.5' : 'pl-4'} pr-1.5 py-1.5 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500`}>
                       {reopenableHubCard && (
                         // Mid quote/spec session: lets the visitor pick another product
                         // without going back to Home — reopens the same drop-up list.
@@ -3873,15 +3880,20 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                       </button>
                     </form>
                   )}
-                  {!configData.white_label_enabled && (
-                    <div className="flex items-center justify-center py-3">
+                  <div className="flex items-center justify-center py-3">
+                    {!configData.white_label_enabled ? (
                       <a href="https://www.sapybase.com" target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 text-[10px] font-sans font-normal tracking-wide text-slate-600 dark:text-slate-300">
                         <Image src={BrandLogo} alt="Vaayu" width={18} height={12} className="opacity-100" />
                         Vaayu Intelligence
                       </a>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-[10px] font-sans font-normal tracking-wide invisible pointer-events-none select-none" aria-hidden="true">
+                        <span className="w-[18px] h-[12px]" />
+                        Vaayu Intelligence
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
