@@ -30,7 +30,9 @@ _TABLE_RULE = re.compile(r"^\s*\|(?:\s*:?-{3,}:?\s*\|)+\s*$")
 _DEFINITION_TERM = re.compile(r"^\*\*.+\*\*$")
 _ENTITY_HEAD = re.compile(r"^- \S")
 _ENTITY_FIELD = re.compile(r"^\s+- \S")
-_LIST_ITEM = re.compile(r"^\s*(?:[-*] |\d+\. )\S")
+# `\s+` after the marker, not a single space: a PDF renders "1.  Acetic acid" with two,
+# which classified every numbered list extracted from a PDF as prose.
+_LIST_ITEM = re.compile(r"^\s*(?:[-*]|\d+\.)\s+\S")
 # Sentence end: terminator, closing quote/bracket optional, then whitespace. Kept
 # deliberately dumb - an abbreviation splitting a prose chunk one sentence early is
 # invisible to a reader, whereas anything cleverer here would need a language model.
@@ -160,6 +162,26 @@ def segment(text: str) -> List[Block]:
     return blocks
 
 
+def _split_lines(lines: List[str], context: str, budget: int) -> Iterator[Chunk]:
+    """Pack whole lines up to the budget, cutting only between them.
+
+    Shared by tables and lists because a row and a list item are the same shape of
+    promise: the line is the record, so the line boundary is the only honest seam.
+    """
+    current: List[str] = []
+    used = 0
+    for line in lines:
+        # A single line wider than the budget still ships whole - a torn record is a
+        # correctness problem, an oversized chunk is only a cost one.
+        if current and used + len(line) + 1 > budget:
+            yield Chunk("\n".join(current), context)
+            current, used = [], 0
+        current.append(line)
+        used += len(line) + 1
+    if current:
+        yield Chunk("\n".join(current), context)
+
+
 def _split_table(block: Block, heading: str, budget: int) -> Iterator[Chunk]:
     """Table -> chunks of whole rows, each carrying the header as context.
 
@@ -168,19 +190,22 @@ def _split_table(block: Block, heading: str, budget: int) -> Iterator[Chunk]:
     """
     header_text = "\n".join(block.header) if block.header else ""
     context = "\n".join(p for p in (heading, header_text) if p)
+    yield from _split_lines(block.lines, context, budget)
 
-    current: List[str] = []
-    used = 0
-    for row in block.lines:
-        # A single row wider than the budget still ships whole - a torn record is a
-        # correctness problem, an oversized chunk is only a cost one.
-        if current and used + len(row) + 1 > budget:
-            yield Chunk("\n".join(current), context)
-            current, used = [], 0
-        current.append(row)
-        used += len(row) + 1
-    if current:
-        yield Chunk("\n".join(current), context)
+
+def _lead_in(block: Optional[Block]) -> str:
+    """The sentence that introduces a list, when the previous block ends in one.
+
+    A list cut into parts leaves the later parts as bare items - "35. Sodium
+    metabisulphite" says nothing about what it is a list OF. A table solves this with
+    its header row; a list's nearest equivalent is the line that announces it, and a
+    trailing colon is the signal that a line is doing that job. Only consulted when a
+    list is actually too big to ship whole, so a list that fits is never affected.
+    """
+    if block is None or block.kind != "paragraph" or not block.lines:
+        return ""
+    last = block.lines[-1].strip()
+    return last if last.endswith(":") else ""
 
 
 def _split_paragraph(text: str, budget: int) -> Iterator[str]:
@@ -225,6 +250,7 @@ def pack(blocks: List[Block], budget: int = PARENT_SIZE) -> List[Chunk]:
             out.append(Chunk("\n\n".join(current), heading_context()))
             current, used = [], 0
 
+    previous: Optional[Block] = None
     for block in blocks:
         if block.kind == "heading":
             # A new heading governs what follows, so close what the previous one did.
@@ -239,6 +265,7 @@ def pack(blocks: List[Block], budget: int = PARENT_SIZE) -> List[Chunk]:
             flush()
             for chunk in _split_table(block, heading_context(), budget):
                 out.append(chunk)
+            previous = block
             continue
 
         if block.atomic or block.size <= budget:
@@ -246,12 +273,25 @@ def pack(blocks: List[Block], budget: int = PARENT_SIZE) -> List[Chunk]:
                 flush()
             current.append(block.text)
             used += block.size + 2
+            previous = block
+            continue
+
+        if block.kind == "list":
+            # Too long to ship whole, so cut it between items and label every part.
+            # Sentence-splitting it here is what severed a 39-item list in production:
+            # "1." reads as a sentence end, so the cut lands inside the list.
+            context = "\n".join(p for p in (heading_context(), _lead_in(previous)) if p)
+            flush()
+            for chunk in _split_lines(block.lines, context, budget):
+                out.append(chunk)
+            previous = block
             continue
 
         # Only paragraphs reach here: too big for one parent and safe to cut.
         flush()
         for piece in _split_paragraph(block.text, budget):
             out.append(Chunk(piece, heading_context()))
+        previous = block
 
     flush()
     return out
@@ -268,8 +308,12 @@ def _children_for(parent: Chunk, budget: int) -> List[Chunk]:
     if len(parent.content) <= budget:
         return [parent]
 
-    return [Chunk(piece, parent.context)
-            for piece in _split_paragraph(parent.content, budget)]
+    # Re-segment rather than sentence-split. Children are what actually get embedded
+    # and searched, so a parent holding a list must not have its items severed on the
+    # way into the index just because the parent itself kept them together.
+    return [Chunk(piece.content,
+                  "\n".join(p for p in (parent.context, piece.context) if p))
+            for piece in pack(segment(parent.content), budget)]
 
 
 def split(text: str, *, parent_size: int = PARENT_SIZE,

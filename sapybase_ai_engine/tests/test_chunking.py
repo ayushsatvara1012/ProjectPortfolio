@@ -276,3 +276,69 @@ class TestCost:
         assert len(table_parents) > 1
         for parent in table_parents:
             assert "| Branch | Address | Phone | Hours |" in parent.chunk.retrievable_text
+
+
+class TestLongListsSurvive:
+    """A list is cut only between items, at any length.
+
+    Production regression (docs/list-answer-consistency-plan.md): a 39-item numbered
+    list in a PDF brochure was severed across two parents, so the bot answered the same
+    question with 34 items once and 39 another. The list is the record here, exactly as
+    a row is the record in a table.
+    """
+
+    HEAD = ("## Food grade range\n"
+            "A comprehensive range of food-grade additives, packed under quality control: \n")
+
+    def _list(self, n: int, sep: str = "  ") -> str:
+        rows = "\n".join(f"{i}.{sep}Compound number {i} with a long descriptive name "
+                         for i in range(1, n + 1))
+        return self.HEAD + rows
+
+    def _items(self, text: str) -> set[int]:
+        import re
+        return {int(m) for m in re.findall(r"(?:^|\s)(\d{1,3})\.\s+\S", text)}
+
+    def test_a_pdf_numbered_list_is_a_list_not_prose(self):
+        # A PDF renders "1.  Acetic acid" with two spaces. Reading that as prose is
+        # what let the sentence splitter cut inside the list.
+        assert kinds("1.  Acetic acid \n2.  Ascorbic acid ") == ["list"]
+
+    @pytest.mark.parametrize("n", [39, 60, 140, 300])
+    def test_no_item_is_ever_severed_or_lost(self, n):
+        parents = split(self._list(n))
+        seen: set[int] = set()
+        for parent in parents:
+            got = self._items(parent.chunk.content)
+            assert not (seen & got), "an item appears in two parents"
+            seen |= got
+        assert seen == set(range(1, n + 1))
+
+    @pytest.mark.parametrize("n", [60, 140, 300])
+    def test_every_part_of_a_split_list_says_what_it_is_a_list_of(self, n):
+        # The list's answer to a table's header row. "35. Sodium metabisulphite" alone
+        # is unusable; the introducing line has to travel with it.
+        for parent in split(self._list(n)):
+            if self._items(parent.chunk.content):
+                assert "food-grade additives" in parent.chunk.context
+
+    @pytest.mark.parametrize("n", [60, 300])
+    def test_children_do_not_sever_items_either(self, n):
+        # Children are what get embedded, so a torn child is a retrieval failure even
+        # when the parent is intact.
+        for parent in split(self._list(n)):
+            for child in parent.children:
+                assert self._items(child.content) <= self._items(parent.chunk.content)
+
+    def test_a_list_that_fits_is_still_packed_whole(self):
+        # The narrow case must not regress into needless splitting.
+        parents = split(self._list(12))
+        holding = [p for p in parents if self._items(p.chunk.content)]
+        assert len(holding) == 1
+        assert self._items(holding[0].chunk.content) == set(range(1, 13))
+
+    def test_the_introducing_line_is_context_not_billed_content(self):
+        # Same rule as a table header: structural, so charged once (plan §6 Q1).
+        for parent in split(self._list(140)):
+            assert "packed under quality control" not in parent.chunk.content.split("\n", 1)[-1] \
+                   or not self._items(parent.chunk.content)
