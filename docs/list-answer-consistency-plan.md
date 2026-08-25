@@ -433,3 +433,43 @@ The wiring test deliberately asserts on the seam rather than re-testing the chun
 Billed words fall when headers and lead-ins stop being billed per chunk ([[entity-safe-ingestion]] measured -14% on real pages).
 `replacement_shrink_reason` refuses an upsert that collapses a source to under a quarter of its stored words, so a 14% fall is comfortably inside the guard.
 It is worth re-checking on the first real re-index rather than assuming, because the guard fires on the billed number and that number is now defined differently.
+
+## 11. Migration 0039 applied dark - 2026-08-25
+
+Applied to the prod control DB (`tticllabbbqwnhsmggfo`) via Supabase MCP, then stamped, per the 0038 precedent.
+
+Pre-flight: `alembic_version` read `0038`, the column did not exist, `company_knowledge` held 1160 rows.
+Applied `ALTER TABLE company_knowledge ADD COLUMN IF NOT EXISTS context TEXT`.
+Post-check: column present, nullable, **1160 rows / 0 with context** - the no-backfill intent exactly.
+
+Verified before stamping, and this is the check worth repeating on any future retrieval change: the new composed expression was run against 200 real Expresolv child rows alongside the old `COALESCE(p.content, ck.content)`, and **0 rows differed**.
+Existing content is provably unaffected by the retrieval change.
+
+`alembic_version` then moved `0038` -> `0039`, and local `alembic heads` reads `0039`, so the Render deploy's `alembic upgrade head` is a no-op.
+
+## 12. BYOD: the column does NOT reach existing tenant databases, and that is deliberate
+
+Found while checking deploy ordering, before the PR.
+It would have failed a live tenant's next training job.
+
+`byod_tenant_databases` today: two LIVE tenants, both recorded at `schema_version = 0002`, and **`bfa77877` has `routing_enabled = true`**.
+So BYOD ingest is a live path, not a dark one, for that company.
+
+Two facts make the obvious fixes wrong:
+
+1. Putting the column in `_build_schema_sql` alone does not reach an existing tenant.
+   `run_migration_rollout` reports tenants at or above target as `current` **without connecting**, and the data-plane head is `0002`, which is what both tenants are recorded at.
+2. Bumping `DATA_PLANE_SCHEMA_VERSION` to `0003` does not work either.
+   The single data-plane revision takes its id **from that constant** (`revision: str = DATA_PLANE_SCHEMA_VERSION`), so bumping it renames the revision tenants are already stamped with, and `_default_upgrade` runs `command.upgrade(cfg, "head")` - which would fail to locate `0002` rather than roll anything forward.
+   It would also drag `ENGINE_MIN_SCHEMA_VERSION` up with it, since that is defined as the same constant, failing both tenants soft.
+
+So the write is gated instead, using the mechanism the subsystem already documents for this exact case (rule 12, `db/byod_schema.py`).
+`byod_ingest.CONTEXT_SCHEMA_VERSION = "0003"`, and `tenant_supports_version(company_id, "0003")` picks the INSERT shape, resolved once per job and failing closed on any error.
+A tenant behind the rollout stores the old shape, keeps working, and picks context up on its next re-index once rolled.
+
+**Left open deliberately, for the owner: how existing tenants get rolled forward.**
+It needs a decision about the data-plane lineage - whether the single revision-tracking-a-constant design becomes a real two-revision lineage, or whether the rollout learns to re-apply the idempotent DDL when the schema SQL changes without the revision id moving.
+That is a change to a subsystem with a live tenant on the other end, and it should not be made silently as a side effect of this slice.
+
+Nothing is broken while it stays open: the shared DB has the column, BYOD ingest is gated, and newly provisioned tenants get the column from `_build_schema_sql`.
+The only cost is that the BYOD tenant's chunks carry no context until this is resolved and its sources are re-indexed.
