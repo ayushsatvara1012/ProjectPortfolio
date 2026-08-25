@@ -168,6 +168,13 @@ class ChunkPair(NamedTuple):
         return "\n".join(p for p in (self.child_context, self.child_content) if p)
 
 
+#: Data-plane schema version that introduced ``company_knowledge.context``. Writes of
+#: that column are gated on the tenant being at/above it (the rule-12 gate), so a
+#: tenant whose DB has not been rolled forward yet stores the OLD shape rather than
+#: failing its ingest on a column that does not exist there.
+CONTEXT_SCHEMA_VERSION = "0003"
+
+
 def as_chunk_pair(chunk) -> ChunkPair:
     """Accept a ChunkPair or a legacy ``(parent, child)`` tuple."""
     return chunk if isinstance(chunk, ChunkPair) else ChunkPair(*chunk)
@@ -349,6 +356,19 @@ async def run_tenant_ingest(
 
     cfg = config or IngestConfig.from_env()
     guard = EmbeddingCostGuard(cfg.max_embeddings_per_job)
+
+    # Rule-12 gate, resolved once per job. The tenant's DB only grew a `context`
+    # column at data-plane 0003, and the rollout that applies it is a separate,
+    # scheduled job - so between a deploy and that rollout a tenant is legitimately
+    # still on the old shape. Writing context unconditionally would fail its ingest
+    # outright. Fail closed: store the old shape, keep the tenant working, and pick
+    # context up on the next re-index after the rollout.
+    try:
+        store_context = byod_engine.tenant_supports_version(
+            company_id, CONTEXT_SCHEMA_VERSION
+        )
+    except Exception:  # never let a gate lookup break an ingest (§16.9)
+        store_context = False
     do_prune = cfg.prune_superseded if prune_superseded is None else prune_superseded
 
     added = embedded = pruned = 0
@@ -399,23 +419,40 @@ async def run_tenant_ingest(
                 if pair.parent_content is not None:
                     parent_id = seen_parents.get(pair.parent_content)
                     if parent_id is None:
-                        cur.execute(
-                            "INSERT INTO company_knowledge "
-                            "(company_id, content, url, embedding, chunk_type, parent_id, context) "
-                            "VALUES (%s, %s, %s, NULL, 'parent', NULL, %s) RETURNING id",
-                            (company_id, pair.parent_content, source_name,
-                             pair.parent_context or None),
-                        )
+                        if store_context:
+                            cur.execute(
+                                "INSERT INTO company_knowledge "
+                                "(company_id, content, url, embedding, chunk_type, parent_id, context) "
+                                "VALUES (%s, %s, %s, NULL, 'parent', NULL, %s) RETURNING id",
+                                (company_id, pair.parent_content, source_name,
+                                 pair.parent_context or None),
+                            )
+                        else:
+                            cur.execute(
+                                "INSERT INTO company_knowledge "
+                                "(company_id, content, url, embedding, chunk_type, parent_id) "
+                                "VALUES (%s, %s, %s, NULL, 'parent', NULL) RETURNING id",
+                                (company_id, pair.parent_content, source_name),
+                            )
                         parent_id = str(cur.fetchone()[0])
                         seen_parents[pair.parent_content] = parent_id
 
-                cur.execute(
-                    "INSERT INTO company_knowledge "
-                    "(company_id, content, url, embedding, chunk_type, parent_id, word_count, context) "
-                    "VALUES (%s, %s, %s, %s, 'child', %s, %s, %s)",
-                    (company_id, pair.child_content, source_name, embedding, parent_id,
-                     len(pair.child_content.split()), pair.child_context or None),
-                )
+                if store_context:
+                    cur.execute(
+                        "INSERT INTO company_knowledge "
+                        "(company_id, content, url, embedding, chunk_type, parent_id, word_count, context) "
+                        "VALUES (%s, %s, %s, %s, 'child', %s, %s, %s)",
+                        (company_id, pair.child_content, source_name, embedding, parent_id,
+                         len(pair.child_content.split()), pair.child_context or None),
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO company_knowledge "
+                        "(company_id, content, url, embedding, chunk_type, parent_id, word_count) "
+                        "VALUES (%s, %s, %s, %s, 'child', %s, %s)",
+                        (company_id, pair.child_content, source_name, embedding, parent_id,
+                         len(pair.child_content.split())),
+                    )
                 added += 1
             conn.commit()  # checkpoint — committed work survives an interruption
 

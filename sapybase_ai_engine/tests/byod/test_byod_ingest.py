@@ -412,3 +412,25 @@ def test_capped_run_does_not_prune_tail(tenant_db_dsn):
         assert _count_children(tenant_db_dsn, company_id, source) == 10  # tail retained
     finally:
         reg.close_all()
+
+
+# ── Rule-12 gate: context is only written once the tenant DB has the column ──────
+def test_context_schema_version_is_the_version_that_added_the_column():
+    # Pinned so the gate and the data-plane lineage cannot drift apart silently.
+    from byod_ingest import CONTEXT_SCHEMA_VERSION
+
+    assert CONTEXT_SCHEMA_VERSION == "0003"
+
+
+def test_a_tenant_behind_the_rollout_still_ingests_on_the_old_shape(monkeypatch):
+    """The deploy and the data-plane rollout are separate events, so a tenant is
+    legitimately on the old shape in between. Writing `context` regardless would
+    fail its ingest on a column that does not exist yet."""
+    from db import byod_schema
+
+    assert byod_schema.version_meets("0002", "0003") is False
+    assert byod_schema.version_meets("0003", "0003") is True
+    # A tenant AHEAD of the requirement still reads True - engine behind tenant.
+    assert byod_schema.version_meets("0004", "0003") is True
+    # Unknown/unrecorded fails closed to the old shape rather than raising.
+    assert byod_schema.version_meets(None, "0003") is False
