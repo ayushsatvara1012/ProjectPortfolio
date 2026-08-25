@@ -26,6 +26,7 @@ from byod_ingest import (
     EmbeddingCostExceeded,
     EmbeddingCostGuard,
     IngestConfig,
+    ChunkPair,
     content_fingerprint,
     normalize_source_url,
     plan_ingest,
@@ -68,8 +69,36 @@ def test_plan_ingest_skips_existing_and_intra_batch_dups():
     existing = {content_fingerprint("b")}
     plan = plan_ingest(chunks, existing)
     # 'b' already stored, second 'a' is a dup → both skipped; 'a','c' embedded.
-    assert [c for _p, c in plan.to_embed] == ["a", "c"]
+    assert [c.child_content for c in plan.to_embed] == ["a", "c"]
     assert plan.skipped == 2
+
+
+def test_plan_ingest_accepts_legacy_pairs_without_context():
+    # The shared path now sends ChunkPairs, but a bare (parent, child) tuple must
+    # still normalise - the two ingest paths drifting is what this shape prevents.
+    plan = plan_ingest([("p", "a")], set())
+    assert plan.to_embed == [ChunkPair("p", "a", "", "")]
+    assert plan.to_embed[0].child_retrievable == "a"
+
+
+def test_dedup_identity_ignores_context():
+    # Context is structure derived from the surrounding document, not new content.
+    # A chunk whose heading was reworded is still the same chunk, so re-training an
+    # unchanged page must not re-embed every row.
+    plan = plan_ingest(
+        [ChunkPair("p", "a", "", "## Old heading"),
+         ChunkPair("p", "a", "", "## New heading")],
+        set(),
+    )
+    assert len(plan.to_embed) == 1
+    assert plan.skipped == 1
+
+
+def test_context_prefixes_only_what_gets_embedded():
+    pair = ChunkPair("p", "35. Sodium metabisulphite", "", "Food additives:")
+    assert pair.child_retrievable == "Food additives:\n35. Sodium metabisulphite"
+    # ...and never leaks into the stored/billed content.
+    assert pair.child_content == "35. Sodium metabisulphite"
 
 
 # ── Pure: prune planner ──────────────────────────────────────────────────────────

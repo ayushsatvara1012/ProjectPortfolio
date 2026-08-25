@@ -82,6 +82,7 @@ METRICS_SCRAPE_TOKEN = os.getenv("METRICS_SCRAPE_TOKEN", "")
 # 1a. Structured Logging
 logger = logging.getLogger(__name__)
 
+from services import chunking
 from services import html_extract
 from services import prompt_safety
 
@@ -2555,6 +2556,7 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
                     id,
                     parent_id,
                     content,
+                    context,
                     url,
                     ROW_NUMBER() OVER (ORDER BY embedding <=> %s::vector) AS rank
                 FROM company_knowledge
@@ -2568,6 +2570,7 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
                     id,
                     parent_id,
                     content,
+                    context,
                     url,
                     ROW_NUMBER() OVER (
                         ORDER BY ts_rank_cd(content_tsv, plainto_tsquery('english', %s)) DESC
@@ -2583,6 +2586,7 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
                     COALESCE(v.id,        b.id)        AS child_id,
                     COALESCE(v.parent_id, b.parent_id) AS parent_id,
                     COALESCE(v.content,   b.content)   AS child_content,
+                    COALESCE(v.context,   b.context)   AS child_context,
                     COALESCE(v.url,       b.url)        AS url,
                     COALESCE(1.0 / (60 + v.rank), 0.0)
                   + COALESCE(1.0 / (60 + b.rank), 0.0) AS rrf_score
@@ -2591,8 +2595,15 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
             )
             SELECT
                 -- Return parent content when available (richer context for the LLM),
-                -- fall back to child content for legacy flat chunks.
-                COALESCE(p.content, rrf.child_content) AS context_content,
+                -- fall back to child content for legacy flat chunks. `context` carries
+                -- the structural labels - enclosing heading, table header row, list
+                -- lead-in - stored separately so they are billed once, and rejoined
+                -- here so the model reads a labelled chunk. NULL for rows ingested
+                -- before migration 0039, where CONCAT_WS simply omits it.
+                CASE WHEN p.id IS NOT NULL
+                     THEN CONCAT_WS(E'\n', NULLIF(p.context, ''), p.content)
+                     ELSE CONCAT_WS(E'\n', NULLIF(rrf.child_context, ''), rrf.child_content)
+                END AS context_content,
                 rrf.url,
                 -- The id of whichever row's content is actually returned above (Slice D,
                 -- agent-conversation-gaps plan §12.3) — lets the owner dashboard link a
@@ -2616,7 +2627,10 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
         cursor.execute(
             """
             SELECT
-                COALESCE(p.content, ck.content) AS context_content,
+                CASE WHEN p.id IS NOT NULL
+                     THEN CONCAT_WS(E'\n', NULLIF(p.context, ''), p.content)
+                     ELSE CONCAT_WS(E'\n', NULLIF(ck.context, ''), ck.content)
+                END AS context_content,
                 ck.url,
                 COALESCE(p.id, ck.id) AS content_id
             FROM company_knowledge ck
@@ -8469,23 +8483,22 @@ async def run_training_job(
             # Tabular: each Document is already one final row-chunk.
             # Store as flat children with no parent.
             child_only_chunks = docs
-            parent_child_pairs = []  # [(parent_text, [child_text, ...])]
+            parent_child_pairs = []  # [(parent Chunk, [child Chunk, ...])]
         else:
-            # Step 1: split into large parent chunks for rich LLM context
-            parent_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1500, chunk_overlap=150
-            )
-            parent_docs = parent_splitter.split_documents(docs)
-
-            # Step 2: split each parent into small child chunks for precise embedding
-            child_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=300, chunk_overlap=50
-            )
+            # Structure-aware: segment into typed blocks and pack whole blocks, so a
+            # table row or a list item is never cut in half (entity-safe-ingestion
+            # plan Phase 2). Replaces the character-counting splitter, which knew
+            # nothing about structure and severed a client's 39-item list in prod.
+            #
+            # Each Chunk carries `content` (verbatim page text, what word_count
+            # bills) and `context` (the enclosing heading, table header, or list
+            # lead-in). They are stored in separate columns and rejoined for both
+            # embedding and retrieval.
             parent_child_pairs = []
-            for parent_doc in parent_docs:
-                child_texts = child_splitter.split_text(parent_doc.page_content)
-                if child_texts:
-                    parent_child_pairs.append((parent_doc.page_content, child_texts))
+            for doc in docs:
+                for parent in chunking.split(doc.page_content):
+                    if parent.children:
+                        parent_child_pairs.append((parent.chunk, parent.children))
             child_only_chunks = []  # not used when parent_child_pairs is populated
 
         # ── BYOD: route ingestion to the tenant's OWN database (Phase 3.4) ────────
@@ -8495,9 +8508,15 @@ async def run_training_job(
         # here, so the function's finally only releases the Redis lock.
         if byod_engine.routing_active(resolved_company_id):
             if skip_splitting:
-                byod_chunks = [(None, d.page_content) for d in child_only_chunks]
+                byod_chunks = [byod_ingest.ChunkPair(None, d.page_content)
+                               for d in child_only_chunks]
             else:
-                byod_chunks = [(p, c) for (p, cs) in parent_child_pairs for c in cs]
+                byod_chunks = [
+                    byod_ingest.ChunkPair(parent.content, child.content,
+                                          parent.context, child.context)
+                    for (parent, children) in parent_child_pairs
+                    for child in children
+                ]
             await _byod_run_training_job(
                 job_id, resolved_company_id, source_name, byod_chunks, limit, is_upsert
             )
@@ -8537,11 +8556,16 @@ async def run_training_job(
             # (parent_db_id, child_Document)
         else:
             all_child_texts_flat = []
-            for parent_text, child_texts in parent_child_pairs:
-                for ct in child_texts:
-                    all_child_texts_flat.append((parent_text, ct))
+            for parent_chunk, child_chunks in parent_child_pairs:
+                for child in child_chunks:
+                    all_child_texts_flat.append((parent_chunk, child))
 
         def _child_word_count(item) -> int:
+            # A Chunk bills its `content` only: `context` is structure the tenant
+            # wrote once, so repeating it onto every part must not repeat the charge
+            # (entity-safe-ingestion plan Q1).
+            if hasattr(item, "billable_words"):
+                return item.billable_words
             text = item.page_content if hasattr(item, "page_content") else item
             return len(text.split())
 
@@ -8624,37 +8648,42 @@ async def run_training_job(
             # Parent-child insertion
             # Group capped children back by parent to minimise parent inserts
             # (a parent is only inserted if at least one of its children survived the cap).
-            seen_parents: dict[str, str] = {}  # parent_text -> parent DB id (as str)
+            seen_parents: dict[chunking.Chunk, str] = {}  # parent Chunk -> DB id
 
             for i in range(0, len(capped_pairs), BATCH_SIZE):
                 batch = capped_pairs[i:i + BATCH_SIZE]
-                # Embed only child texts (parents are not embedded)
-                child_texts = [ct for (_, ct) in batch]
+                # Embed the child WITH its context prefix: that is what makes an
+                # unlabelled table row or list item retrievable at all. It is stored
+                # and billed without it, so the stored vector and the billed text
+                # deliberately differ (entity-safe-ingestion plan Q1).
+                child_texts = [ct.retrievable_text for (_, ct) in batch]
                 embeddings_list = await embeddings_model_doc.aembed_documents(child_texts)
 
-                for (parent_text, child_text), embedding in zip(batch, embeddings_list):
-                    # Insert parent row on first encounter of this parent text
-                    if parent_text not in seen_parents:
+                for (parent_chunk, child_chunk), embedding in zip(batch, embeddings_list):
+                    # Insert parent row on first encounter of this parent
+                    if parent_chunk not in seen_parents:
                         cursor.execute(
                             """INSERT INTO company_knowledge
-                                   (company_id, content, url, embedding, chunk_type, parent_id)
-                               VALUES (%s, %s, %s, NULL, 'parent', NULL)
+                                   (company_id, content, url, embedding, chunk_type, parent_id, context)
+                               VALUES (%s, %s, %s, NULL, 'parent', NULL, %s)
                                RETURNING id""",
-                            (resolved_company_id, parent_text, temp_source_name)
+                            (resolved_company_id, parent_chunk.content, temp_source_name,
+                             parent_chunk.context or None)
                         )
                         parent_db_id = cursor.fetchone()[0]
-                        seen_parents[parent_text] = parent_db_id
+                        seen_parents[parent_chunk] = parent_db_id
                         total_rows_committed += 1
                     else:
-                        parent_db_id = seen_parents[parent_text]
+                        parent_db_id = seen_parents[parent_chunk]
 
                     if len(embedding) > EMBEDDING_DIMENSIONS:
                         embedding = embedding[:EMBEDDING_DIMENSIONS]
                     cursor.execute(
                         """INSERT INTO company_knowledge
-                               (company_id, content, url, embedding, chunk_type, parent_id, word_count)
-                           VALUES (%s, %s, %s, %s, 'child', %s, %s)""",
-                        (resolved_company_id, child_text, temp_source_name, embedding, parent_db_id, len(child_text.split()))
+                               (company_id, content, url, embedding, chunk_type, parent_id, word_count, context)
+                           VALUES (%s, %s, %s, %s, 'child', %s, %s, %s)""",
+                        (resolved_company_id, child_chunk.content, temp_source_name, embedding,
+                         parent_db_id, child_chunk.billable_words, child_chunk.context or None)
                     )
                     child_chunks_committed += 1
                     total_rows_committed += 1
