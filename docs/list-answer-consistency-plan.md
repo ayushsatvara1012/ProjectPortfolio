@@ -1,6 +1,6 @@
 # List answer consistency plan
 
-Status: DIAGNOSIS COMPLETE. D1 + Phase 3 wiring BUILT and committed, NOT merged, NOT applied to prod. Phases 1, 2, 4, 5, 6 unstarted.
+Status: DIAGNOSIS COMPLETE. D1 + Phase 3 wiring BUILT, migration 0039 APPLIED DARK + stamped, PR #122 OPEN against `MainV2`. Phases 1, 2, 4, 5, 6 unstarted.
 Opened 2026-08-25 from three live Expresolv conversations on 2026-08-22.
 Branch: `feature/list-atomic-chunking`, off `feature/entity-safe-ingestion`, with `MainV2` merged in (26 commits, none touching `main.py`, clean).
 
