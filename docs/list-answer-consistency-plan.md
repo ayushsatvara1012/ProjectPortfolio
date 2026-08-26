@@ -485,6 +485,7 @@ The PR body leads with the BYOD gap (§12), because that is the part a reviewer 
 ## 14. Phase 1 built - parent dedupe, 2026-08-25
 
 Commit `8c2eaa7a` on `bugfix/retrieval-parent-dedupe`, branched off `MainV2` so it reviews and ships independently of #122.
+**PR #123**, mergeable, 4 files +270/-25.
 Suite 2701 passed / 138 skipped, `eslint src public` 0 errors.
 
 **The open measurement from Phase 1 is now answered, and it changed the design.**
