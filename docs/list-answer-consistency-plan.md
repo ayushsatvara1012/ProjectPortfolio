@@ -1,6 +1,6 @@
 # List answer consistency plan
 
-Status: DIAGNOSIS COMPLETE. D1 + Phase 3 wiring BUILT, migration 0039 APPLIED DARK + stamped, PR #122 OPEN against `MainV2`. Phases 1, 2, 4, 5, 6 unstarted.
+Status: DIAGNOSIS COMPLETE. D1 + Phase 3 wiring MERGED (`#122` -> `MainV2` `89a2ebc`), migration 0039 APPLIED DARK + stamped. Phase 1 parent dedupe BUILT, rebased onto merged `MainV2`, PR #123 open. Phases 2, 4, 5, 6 unstarted.
 Opened 2026-08-25 from three live Expresolv conversations on 2026-08-22.
 Branch: `feature/list-atomic-chunking`, off `feature/entity-safe-ingestion`, with `MainV2` merged in (26 commits, none touching `main.py`, clean).
 
@@ -481,3 +481,61 @@ https://github.com/ayushsatvara1012/ProjectPortfolio/pull/122, `feature/list-ato
 Suite 2751 passed / 134 skipped, `eslint src public` 0 errors, migration 0039 already applied dark and stamped.
 
 The PR body leads with the BYOD gap (§12), because that is the part a reviewer most needs to agree with and the one carrying an open decision.
+
+## 14. Phase 1 built - parent dedupe, 2026-08-25
+
+Commit `8c2eaa7a` on `bugfix/retrieval-parent-dedupe`, branched off `MainV2` so it reviews and ships independently of #122.
+**PR #123**, mergeable, 4 files +270/-25.
+Suite 2701 passed / 138 skipped, `eslint src public` 0 errors.
+
+**The open measurement from Phase 1 is now answered, and it changed the design.**
+Run against the live control DB before writing anything, using the BM25 half of the real query on the actual incident questions:
+
+| query | candidates in 15 | distinct parents |
+|---|---|---|
+| which are the products | 15 | **9** (top-5 gave only **3**) |
+| products under FSSAI license | 2 | 2 |
+| which are the products under FSSAI license | 2 | 2 |
+| can give name of those products | 1 | 1 |
+
+Two things follow, and the second was not anticipated:
+
+1. Where candidates are plentiful the collapse is severe - 15 rows to 9 parents, and a top-5 to 3. Dedupe recovers real slots.
+2. **Several of the incident queries cannot fill 5 slots at all**, because the whole corpus yields only 1-2 matching parents for them. Those are low-recall queries, and no amount of deduping or widening fixes them. They belong to Phase 2 (history-aware rewriting), not here.
+
+So the fix is dedupe alone. The candidate window was NOT widened: `DISTINCT ON` applied to the fused set now returns up to `limit` *distinct* parents rather than `limit` rows that collapse, which is strictly better and needs no extra tuning. Re-measured after the change: the same 15-row window returns **15 distinct parents**, still in relevance order.
+
+The pure-vector fallback was verified the same way, using a real stored embedding as the probe: 15 rows, **11 distinct before, 15 after**, nearest-first preserved.
+
+Both branches change together. `_byod_retrieve_knowledge` calls straight through to `retrieve_knowledge`, so the tenant path cannot drift from the shared one - the trap [[entity-safe-ingestion]] logged for the ingest pair does not apply here by construction.
+
+**A trap worth recording.**
+`DISTINCT ON` dictates its own leading `ORDER BY`, so relevance order has to be restored in an outer query.
+Getting that wrong does not fail - it silently ranks results by parent id.
+Wrapping each branch in a sub-select also changes the placeholder count, which is a runtime-only failure in the chat hot path; the fallback needed its params re-bound, and a test now asserts placeholders and params agree on both branches.
+
+**Testing honesty.**
+The four behavioural tests build a fat parent with six children plus two rivals and assert the rivals still surface.
+They need a real Postgres with pgvector, and **they were not run** - Docker is unavailable here and the local Postgres needs a password.
+They collect cleanly and skip. Run them with `BYOD_TEST_TENANT_DSN` set, or with Docker plus `requirements-dev.txt`, before trusting them.
+The six query-shape tests run everywhere and did pass.
+
+**Effect on the incident, stated precisely.** With Phase 3 merged the whole list lives in one parent, so dedupe is no longer what decides that answer. Its value is general: every query stops wasting slots on copies, and the prompt stops receiving the same passage three times.
+
+**Rebase note, 2026-08-26.** `#122` merged to `MainV2` first, which conflicted with this branch in `retrieve_knowledge`'s two `SELECT` blocks - `#122` added the `context`-composing `CASE`/`CONCAT_WS`, this commit added the `DISTINCT ON` dedupe wrapper around the same block. Rebased onto post-merge `MainV2`, resolving by wrapping the dedupe around the context-composed row in both branches - both fixes apply, neither is dropped. Re-verified: syntax parses, suite green after the rebase (see §15).
+
+## 15. PR #123 rebased onto merged MainV2 - 2026-08-26
+
+`#122` merged first (`89a2ebcc`), which conflicted this branch in `retrieve_knowledge`'s two `SELECT` blocks - both PRs edited the same region for unrelated reasons (`#122`: compose `context`+`content`; `#123`: dedupe by parent).
+
+Resolved by rebasing `bugfix/retrieval-parent-dedupe` onto `origin/MainV2`, wrapping `#123`'s `DISTINCT ON` dedupe around `#122`'s `CASE`/`CONCAT_WS` context-compose in both branches - neither fix dropped, both apply together.
+Force-pushed with `--force-with-lease`.
+
+Re-verified rather than assumed correct after the resolve:
+- `main.py` parses.
+- Suite green: **2757 passed, 138 skipped** (up from 2701 pre-merge, since `MainV2` brought #122's own tests).
+- `eslint src public`: 0 errors, unchanged.
+- The 6 always-run query-shape tests pass; the 4 Postgres-backed behavioural tests still skip, same as before the rebase - not a new gap.
+- **Re-ran the merged SQL directly against live Expresolv data** (not assumed from the code diff): 15 rows in, **15 distinct parents**, 0 null `context_content`. Confirms the dedupe and the context-compose both hold in the actually-merged shape.
+
+PR #123: `CONFLICTING` -> `MERGEABLE`.
