@@ -2593,27 +2593,40 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
                 FROM vector_ranked v
                 FULL OUTER JOIN bm25_ranked b USING (id)
             )
-            SELECT
-                -- Return parent content when available (richer context for the LLM),
-                -- fall back to child content for legacy flat chunks. `context` carries
-                -- the structural labels - enclosing heading, table header row, list
-                -- lead-in - stored separately so they are billed once, and rejoined
-                -- here so the model reads a labelled chunk. NULL for rows ingested
-                -- before migration 0039, where CONCAT_WS simply omits it.
-                CASE WHEN p.id IS NOT NULL
-                     THEN CONCAT_WS(E'\n', NULLIF(p.context, ''), p.content)
-                     ELSE CONCAT_WS(E'\n', NULLIF(rrf.child_context, ''), rrf.child_content)
-                END AS context_content,
-                rrf.url,
-                -- The id of whichever row's content is actually returned above (Slice D,
-                -- agent-conversation-gaps plan §12.3) — lets the owner dashboard link a
-                -- source back to its chunk. Appended, never inserted, so every existing
-                -- consumer indexing row[0]/row[1] is unaffected.
-                COALESCE(p.id, rrf.child_id) AS content_id
-            FROM rrf
-            LEFT JOIN company_knowledge p
-                   ON p.id = rrf.parent_id
-            ORDER BY rrf.rrf_score DESC
+            SELECT context_content, url, content_id
+            FROM (
+                -- One row per RESOLVED PARENT, keeping its best-scoring child.
+                -- Several children of one parent routinely win adjacent ranks, and
+                -- each resolves to the SAME parent text — so without this, one parent
+                -- could occupy four of the five slots handed to the reranker while
+                -- the chunk holding the rest of the answer was crowded out. Measured
+                -- on real data: a 15-row window collapsed to 8 distinct parents, and
+                -- a top-5 to 3.
+                SELECT DISTINCT ON (COALESCE(p.id, rrf.child_id))
+                    -- Return parent content when available (richer context for the LLM),
+                    -- fall back to child content for legacy flat chunks. `context` carries
+                    -- the structural labels - enclosing heading, table header row, list
+                    -- lead-in - stored separately so they are billed once, and rejoined
+                    -- here so the model reads a labelled chunk. NULL for rows ingested
+                    -- before migration 0039, where CONCAT_WS simply omits it.
+                    CASE WHEN p.id IS NOT NULL
+                         THEN CONCAT_WS(E'\n', NULLIF(p.context, ''), p.content)
+                         ELSE CONCAT_WS(E'\n', NULLIF(rrf.child_context, ''), rrf.child_content)
+                    END AS context_content,
+                    rrf.url,
+                    -- The id of whichever row's content is actually returned above (Slice D,
+                    -- agent-conversation-gaps plan §12.3) — lets the owner dashboard link a
+                    -- source back to its chunk. Appended, never inserted, so every existing
+                    -- consumer indexing row[0]/row[1] is unaffected.
+                    COALESCE(p.id, rrf.child_id) AS content_id,
+                    rrf.rrf_score
+                FROM rrf
+                LEFT JOIN company_knowledge p
+                       ON p.id = rrf.parent_id
+                ORDER BY COALESCE(p.id, rrf.child_id), rrf.rrf_score DESC
+            ) deduped
+            -- DISTINCT ON forces its own ORDER BY, so relevance order is restored here.
+            ORDER BY deduped.rrf_score DESC
             LIMIT %s
             """,
             (
@@ -2626,22 +2639,30 @@ def retrieve_knowledge(conn, company_id, query_vector, query_text: str = "", lim
         # Pre-v20 fallback or empty query: pure vector search with parent resolution
         cursor.execute(
             """
-            SELECT
-                CASE WHEN p.id IS NOT NULL
-                     THEN CONCAT_WS(E'\n', NULLIF(p.context, ''), p.content)
-                     ELSE CONCAT_WS(E'\n', NULLIF(ck.context, ''), ck.content)
-                END AS context_content,
-                ck.url,
-                COALESCE(p.id, ck.id) AS content_id
-            FROM company_knowledge ck
-            LEFT JOIN company_knowledge p ON p.id = ck.parent_id
-            WHERE ck.company_id = %s
-              AND ck.chunk_type = 'child'
-              AND ck.embedding <=> %s::vector < 0.55
-            ORDER BY ck.embedding <=> %s::vector
+            SELECT context_content, url, content_id
+            FROM (
+                -- Same parent dedupe as the hybrid branch above: one row per resolved
+                -- parent, keeping its nearest child.
+                SELECT DISTINCT ON (COALESCE(p.id, ck.id))
+                    CASE WHEN p.id IS NOT NULL
+                         THEN CONCAT_WS(E'\n', NULLIF(p.context, ''), p.content)
+                         ELSE CONCAT_WS(E'\n', NULLIF(ck.context, ''), ck.content)
+                    END AS context_content,
+                    ck.url,
+                    COALESCE(p.id, ck.id) AS content_id,
+                    ck.embedding <=> %s::vector AS distance
+                FROM company_knowledge ck
+                LEFT JOIN company_knowledge p ON p.id = ck.parent_id
+                WHERE ck.company_id = %s
+                  AND ck.chunk_type = 'child'
+                  AND ck.embedding <=> %s::vector < 0.55
+                ORDER BY COALESCE(p.id, ck.id), ck.embedding <=> %s::vector
+            ) deduped
+            ORDER BY deduped.distance
             LIMIT %s
             """,
-            (company_id, query_vector, query_vector, limit)
+            # distance (select), company_id, threshold, ORDER BY distance, limit
+            (query_vector, company_id, query_vector, query_vector, limit)
         )
 
     results = cursor.fetchall()
