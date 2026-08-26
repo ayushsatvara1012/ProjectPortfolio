@@ -523,3 +523,19 @@ The six query-shape tests run everywhere and did pass.
 **Effect on the incident, stated precisely.** With Phase 3 merged the whole list lives in one parent, so dedupe is no longer what decides that answer. Its value is general: every query stops wasting slots on copies, and the prompt stops receiving the same passage three times.
 
 **Rebase note, 2026-08-26.** `#122` merged to `MainV2` first, which conflicted with this branch in `retrieve_knowledge`'s two `SELECT` blocks - `#122` added the `context`-composing `CASE`/`CONCAT_WS`, this commit added the `DISTINCT ON` dedupe wrapper around the same block. Rebased onto post-merge `MainV2`, resolving by wrapping the dedupe around the context-composed row in both branches - both fixes apply, neither is dropped. Re-verified: syntax parses, suite green after the rebase (see §15).
+
+## 15. PR #123 rebased onto merged MainV2 - 2026-08-26
+
+`#122` merged first (`89a2ebcc`), which conflicted this branch in `retrieve_knowledge`'s two `SELECT` blocks - both PRs edited the same region for unrelated reasons (`#122`: compose `context`+`content`; `#123`: dedupe by parent).
+
+Resolved by rebasing `bugfix/retrieval-parent-dedupe` onto `origin/MainV2`, wrapping `#123`'s `DISTINCT ON` dedupe around `#122`'s `CASE`/`CONCAT_WS` context-compose in both branches - neither fix dropped, both apply together.
+Force-pushed with `--force-with-lease`.
+
+Re-verified rather than assumed correct after the resolve:
+- `main.py` parses.
+- Suite green: **2757 passed, 138 skipped** (up from 2701 pre-merge, since `MainV2` brought #122's own tests).
+- `eslint src public`: 0 errors, unchanged.
+- The 6 always-run query-shape tests pass; the 4 Postgres-backed behavioural tests still skip, same as before the rebase - not a new gap.
+- **Re-ran the merged SQL directly against live Expresolv data** (not assumed from the code diff): 15 rows in, **15 distinct parents**, 0 null `context_content`. Confirms the dedupe and the context-compose both hold in the actually-merged shape.
+
+PR #123: `CONFLICTING` -> `MERGEABLE`.
