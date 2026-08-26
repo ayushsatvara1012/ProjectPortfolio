@@ -473,3 +473,11 @@ That is a change to a subsystem with a live tenant on the other end, and it shou
 
 Nothing is broken while it stays open: the shared DB has the column, BYOD ingest is gated, and newly provisioned tenants get the column from `_build_schema_sql`.
 The only cost is that the BYOD tenant's chunks carry no context until this is resolved and its sources are re-indexed.
+
+## 13. PR #122 opened - 2026-08-25
+
+https://github.com/ayushsatvara1012/ProjectPortfolio/pull/122, `feature/list-atomic-chunking` -> `MainV2`.
+11 files, +1756/-66, 9 commits.
+Suite 2751 passed / 134 skipped, `eslint src public` 0 errors, migration 0039 already applied dark and stamped.
+
+The PR body leads with the BYOD gap (§12), because that is the part a reviewer most needs to agree with and the one carrying an open decision.
