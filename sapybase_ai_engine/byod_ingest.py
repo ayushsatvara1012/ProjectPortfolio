@@ -34,6 +34,7 @@ from typing import (
     Awaitable,
     Callable,
     List,
+    NamedTuple,
     Optional,
     Sequence,
     Set,
@@ -139,28 +140,69 @@ class EmbeddingCostGuard:
         return max(0, self.max_embeddings - self.used)
 
 
+class ChunkPair(NamedTuple):
+    """A child chunk and the parent it belongs to, each with its structural context.
+
+    Replaces the original ``(parent_text, child_text)`` pair so the tenant path stores
+    the SAME structure-aware chunks as the shared path (entity-safe-ingestion plan
+    Phase 2). The two ingest paths drifting is the failure mode this shape exists to
+    prevent.
+
+    Field order keeps the first two positions of the old pair, so a legacy 2-tuple
+    normalises into a context-free ChunkPair and every existing caller still reads.
+
+    Identity for dedup and pruning stays on ``child_content`` alone: context is
+    structure derived from the surrounding document, not new content, so a chunk whose
+    heading was reworded is still the same chunk.
+    """
+
+    parent_content: Optional[str]
+    child_content: str
+    parent_context: str = ""
+    child_context: str = ""
+
+    @property
+    def child_retrievable(self) -> str:
+        """What gets embedded: the child prefixed by its context. Stored and billed
+        without it, so the vector and the billed text deliberately differ."""
+        return "\n".join(p for p in (self.child_context, self.child_content) if p)
+
+
+#: Data-plane schema version that introduced ``company_knowledge.context``. Writes of
+#: that column are gated on the tenant being at/above it (the rule-12 gate), so a
+#: tenant whose DB has not been rolled forward yet stores the OLD shape rather than
+#: failing its ingest on a column that does not exist there.
+CONTEXT_SCHEMA_VERSION = "0003"
+
+
+def as_chunk_pair(chunk) -> ChunkPair:
+    """Accept a ChunkPair or a legacy ``(parent, child)`` tuple."""
+    return chunk if isinstance(chunk, ChunkPair) else ChunkPair(*chunk)
+
+
 @dataclass(frozen=True)
 class IngestPlan:
-    to_embed: List[Tuple[Optional[str], str]]  # (parent_text|None, child_text) needing embed
-    skipped: int                                # chunks deduped (already stored / dup in batch)
+    to_embed: List[ChunkPair]  # chunks needing embed
+    skipped: int               # chunks deduped (already stored / dup in batch)
 
 
 def plan_ingest(
-    chunks: Sequence[Tuple[Optional[str], str]],
+    chunks: Sequence[ChunkPair],
     existing_fingerprints: Set[str],
 ) -> IngestPlan:
     """Compute the delta to embed: drop any child chunk whose content fingerprint is
     already stored (resume/dedup, §16.7) or repeats earlier in this batch."""
-    to_embed: List[Tuple[Optional[str], str]] = []
+    to_embed: List[ChunkPair] = []
     seen: Set[str] = set()
     skipped = 0
-    for parent_text, child_text in chunks:
-        fp = content_fingerprint(child_text)
+    for chunk in chunks:
+        pair = as_chunk_pair(chunk)
+        fp = content_fingerprint(pair.child_content)
         if fp in existing_fingerprints or fp in seen:
             skipped += 1
             continue
         seen.add(fp)
-        to_embed.append((parent_text, child_text))
+        to_embed.append(pair)
     return IngestPlan(to_embed=to_embed, skipped=skipped)
 
 
@@ -294,8 +336,9 @@ async def run_tenant_ingest(
     own ``company_knowledge`` (rule 1 — via get_tenant_db / vaayu_runtime; E11,
     §16.7).
 
-    ``chunks`` are ``(parent_text | None, child_text)`` pairs (children are embedded;
-    a non-None parent is stored once and linked). Dedup + resume: child chunks whose
+    ``chunks`` are :class:`ChunkPair` records (children are embedded; a non-None parent
+    is stored once and linked). Legacy ``(parent, child)`` tuples are still accepted
+    and normalise to a context-free pair. Dedup + resume: child chunks whose
     content is already stored are skipped, and existing parents are reused. The
     per-job :class:`EmbeddingCostGuard` stops the run cleanly at its budget. Each
     batch is committed (checkpoint) so an interrupted job resumes without
@@ -313,6 +356,19 @@ async def run_tenant_ingest(
 
     cfg = config or IngestConfig.from_env()
     guard = EmbeddingCostGuard(cfg.max_embeddings_per_job)
+
+    # Rule-12 gate, resolved once per job. The tenant's DB only grew a `context`
+    # column at data-plane 0003, and the rollout that applies it is a separate,
+    # scheduled job - so between a deploy and that rollout a tenant is legitimately
+    # still on the old shape. Writing context unconditionally would fail its ingest
+    # outright. Fail closed: store the old shape, keep the tenant working, and pick
+    # context up on the next re-index after the rollout.
+    try:
+        store_context = byod_engine.tenant_supports_version(
+            company_id, CONTEXT_SCHEMA_VERSION
+        )
+    except Exception:  # never let a gate lookup break an ingest (§16.9)
+        store_context = False
     do_prune = cfg.prune_superseded if prune_superseded is None else prune_superseded
 
     added = embedded = pruned = 0
@@ -332,7 +388,9 @@ async def run_tenant_ingest(
 
     for start in range(0, total, cfg.batch_size):
         batch = to_embed[start:start + cfg.batch_size]
-        child_texts = [c for (_p, c) in batch]
+        # Embed the child WITH its context prefix - that is what makes an unlabelled
+        # table row or list item retrievable. Stored and billed without it.
+        child_texts = [pair.child_retrievable for pair in batch]
 
         if not guard.can_afford(len(child_texts)):
             capped_by_cost = True
@@ -353,29 +411,48 @@ async def run_tenant_ingest(
         #    later failure resumes from here rather than re-embedding committed work.
         with byod_engine.tenant_connection(company_id, registry=registry) as conn:
             cur = conn.cursor()
-            for (parent_text, child_text), embedding in zip(batch, embeddings):
+            for pair, embedding in zip(batch, embeddings):
                 if len(embedding) > EMBEDDING_DIMENSIONS:
                     embedding = embedding[:EMBEDDING_DIMENSIONS]
 
                 parent_id = None
-                if parent_text is not None:
-                    parent_id = seen_parents.get(parent_text)
+                if pair.parent_content is not None:
+                    parent_id = seen_parents.get(pair.parent_content)
                     if parent_id is None:
-                        cur.execute(
-                            "INSERT INTO company_knowledge "
-                            "(company_id, content, url, embedding, chunk_type, parent_id) "
-                            "VALUES (%s, %s, %s, NULL, 'parent', NULL) RETURNING id",
-                            (company_id, parent_text, source_name),
-                        )
+                        if store_context:
+                            cur.execute(
+                                "INSERT INTO company_knowledge "
+                                "(company_id, content, url, embedding, chunk_type, parent_id, context) "
+                                "VALUES (%s, %s, %s, NULL, 'parent', NULL, %s) RETURNING id",
+                                (company_id, pair.parent_content, source_name,
+                                 pair.parent_context or None),
+                            )
+                        else:
+                            cur.execute(
+                                "INSERT INTO company_knowledge "
+                                "(company_id, content, url, embedding, chunk_type, parent_id) "
+                                "VALUES (%s, %s, %s, NULL, 'parent', NULL) RETURNING id",
+                                (company_id, pair.parent_content, source_name),
+                            )
                         parent_id = str(cur.fetchone()[0])
-                        seen_parents[parent_text] = parent_id
+                        seen_parents[pair.parent_content] = parent_id
 
-                cur.execute(
-                    "INSERT INTO company_knowledge "
-                    "(company_id, content, url, embedding, chunk_type, parent_id, word_count) "
-                    "VALUES (%s, %s, %s, %s, 'child', %s, %s)",
-                    (company_id, child_text, source_name, embedding, parent_id, len(child_text.split())),
-                )
+                if store_context:
+                    cur.execute(
+                        "INSERT INTO company_knowledge "
+                        "(company_id, content, url, embedding, chunk_type, parent_id, word_count, context) "
+                        "VALUES (%s, %s, %s, %s, 'child', %s, %s, %s)",
+                        (company_id, pair.child_content, source_name, embedding, parent_id,
+                         len(pair.child_content.split()), pair.child_context or None),
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO company_knowledge "
+                        "(company_id, content, url, embedding, chunk_type, parent_id, word_count) "
+                        "VALUES (%s, %s, %s, %s, 'child', %s, %s)",
+                        (company_id, pair.child_content, source_name, embedding, parent_id,
+                         len(pair.child_content.split())),
+                    )
                 added += 1
             conn.commit()  # checkpoint — committed work survives an interruption
 
@@ -389,7 +466,7 @@ async def run_tenant_ingest(
     #    set (incl. dedup-skipped chunks that survive unchanged), so anything not in
     #    it is genuinely gone from the source.
     if do_prune and not capped_by_cost:
-        current_fps = {content_fingerprint(c) for (_p, c) in chunks}
+        current_fps = {content_fingerprint(as_chunk_pair(c).child_content) for c in chunks}
         with byod_engine.tenant_connection(company_id, registry=registry) as conn:
             cur = conn.cursor()
             stored = stored_children_for_source(cur, company_id, source_name)

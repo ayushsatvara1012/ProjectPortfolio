@@ -98,6 +98,11 @@ CREATE TABLE IF NOT EXISTS company_knowledge (
 -- enforcement instead of counting chunk rows. ADD COLUMN (not part of the
 -- CREATE TABLE) so this also lands on a tenant DB provisioned before 0002.
 ALTER TABLE company_knowledge ADD COLUMN IF NOT EXISTS word_count INTEGER;
+-- entity-safe-ingestion plan Phase 2: structural labels (enclosing heading, table
+-- header row, list lead-in) stored beside the content so they can be repeated onto
+-- every part of a split record without being billed per chunk. Mirrors control-plane
+-- migration 0039. ADD COLUMN so it also lands on a tenant DB provisioned earlier.
+ALTER TABLE company_knowledge ADD COLUMN IF NOT EXISTS context TEXT;
 CREATE INDEX IF NOT EXISTS company_knowledge_embedding_hnsw
     ON company_knowledge USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS idx_company_knowledge_company

@@ -26,6 +26,7 @@ from byod_ingest import (
     EmbeddingCostExceeded,
     EmbeddingCostGuard,
     IngestConfig,
+    ChunkPair,
     content_fingerprint,
     normalize_source_url,
     plan_ingest,
@@ -68,8 +69,36 @@ def test_plan_ingest_skips_existing_and_intra_batch_dups():
     existing = {content_fingerprint("b")}
     plan = plan_ingest(chunks, existing)
     # 'b' already stored, second 'a' is a dup → both skipped; 'a','c' embedded.
-    assert [c for _p, c in plan.to_embed] == ["a", "c"]
+    assert [c.child_content for c in plan.to_embed] == ["a", "c"]
     assert plan.skipped == 2
+
+
+def test_plan_ingest_accepts_legacy_pairs_without_context():
+    # The shared path now sends ChunkPairs, but a bare (parent, child) tuple must
+    # still normalise - the two ingest paths drifting is what this shape prevents.
+    plan = plan_ingest([("p", "a")], set())
+    assert plan.to_embed == [ChunkPair("p", "a", "", "")]
+    assert plan.to_embed[0].child_retrievable == "a"
+
+
+def test_dedup_identity_ignores_context():
+    # Context is structure derived from the surrounding document, not new content.
+    # A chunk whose heading was reworded is still the same chunk, so re-training an
+    # unchanged page must not re-embed every row.
+    plan = plan_ingest(
+        [ChunkPair("p", "a", "", "## Old heading"),
+         ChunkPair("p", "a", "", "## New heading")],
+        set(),
+    )
+    assert len(plan.to_embed) == 1
+    assert plan.skipped == 1
+
+
+def test_context_prefixes_only_what_gets_embedded():
+    pair = ChunkPair("p", "35. Sodium metabisulphite", "", "Food additives:")
+    assert pair.child_retrievable == "Food additives:\n35. Sodium metabisulphite"
+    # ...and never leaks into the stored/billed content.
+    assert pair.child_content == "35. Sodium metabisulphite"
 
 
 # ── Pure: prune planner ──────────────────────────────────────────────────────────
@@ -383,3 +412,25 @@ def test_capped_run_does_not_prune_tail(tenant_db_dsn):
         assert _count_children(tenant_db_dsn, company_id, source) == 10  # tail retained
     finally:
         reg.close_all()
+
+
+# ── Rule-12 gate: context is only written once the tenant DB has the column ──────
+def test_context_schema_version_is_the_version_that_added_the_column():
+    # Pinned so the gate and the data-plane lineage cannot drift apart silently.
+    from byod_ingest import CONTEXT_SCHEMA_VERSION
+
+    assert CONTEXT_SCHEMA_VERSION == "0003"
+
+
+def test_a_tenant_behind_the_rollout_still_ingests_on_the_old_shape(monkeypatch):
+    """The deploy and the data-plane rollout are separate events, so a tenant is
+    legitimately on the old shape in between. Writing `context` regardless would
+    fail its ingest on a column that does not exist yet."""
+    from db import byod_schema
+
+    assert byod_schema.version_meets("0002", "0003") is False
+    assert byod_schema.version_meets("0003", "0003") is True
+    # A tenant AHEAD of the requirement still reads True - engine behind tenant.
+    assert byod_schema.version_meets("0004", "0003") is True
+    # Unknown/unrecorded fails closed to the old shape rather than raising.
+    assert byod_schema.version_meets(None, "0003") is False
