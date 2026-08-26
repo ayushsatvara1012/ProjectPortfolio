@@ -1,6 +1,6 @@
 # List answer consistency plan
 
-Status: DIAGNOSIS COMPLETE. D1 + Phase 3 wiring MERGED (`#122` -> `MainV2` `89a2ebc`), migration 0039 APPLIED DARK + stamped. Phase 1 parent dedupe BUILT, rebased onto merged `MainV2`, PR #123 open. Phases 2, 4, 5, 6 unstarted.
+Status: D1 + Phase 3 wiring MERGED (`#122` -> `MainV2` `89a2ebc`), migration 0039 APPLIED DARK + stamped. Phase 1 parent dedupe MERGED (`#123` -> `MainV2` `02e7757`). Phases 2, 4, 5, 6 unstarted. NEXT: re-index Expresolv's PDF.
 Opened 2026-08-25 from three live Expresolv conversations on 2026-08-22.
 Branch: `feature/list-atomic-chunking`, off `feature/entity-safe-ingestion`, with `MainV2` merged in (26 commits, none touching `main.py`, clean).
 
@@ -539,3 +539,16 @@ Re-verified rather than assumed correct after the resolve:
 - **Re-ran the merged SQL directly against live Expresolv data** (not assumed from the code diff): 15 rows in, **15 distinct parents**, 0 null `context_content`. Confirms the dedupe and the context-compose both hold in the actually-merged shape.
 
 PR #123: `CONFLICTING` -> `MERGEABLE`.
+
+## 16. PR #123 merged - 2026-08-26
+
+`02e77574` on `MainV2`, squash-merged.
+
+Both PRs from this incident are now on `MainV2`: `#122` (list-atomic chunking + wiring) and `#123` (parent dedupe). Migration 0039 was applied to prod earlier and is a no-op on this deploy.
+
+**Remaining, in order:**
+1. Re-index Expresolv's `food additives at expresolv.pdf` specifically - the fix is ingest-only and their prior re-train covered URL sources only.
+2. Owner decision on how existing BYOD tenants get their `context` column rolled forward (§12) - nothing broken while open, but the routing-enabled tenant's chunks carry no context until resolved.
+3. Everything in Phases 2, 4, 5, 6 - history-aware rewriting, HyDE bypass for lists, reconciling rerank score with the refusal gate, and the false `Has gaps` badges.
+
+Still unrelated and still open: the `text = uuid` join in `list_quote_requests`/`list_agent_requests` (500 since 2026-07-05), and Render memory headroom.
