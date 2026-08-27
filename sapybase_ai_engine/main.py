@@ -1408,7 +1408,7 @@ from db.models import (
     CustomPlanProvisionRequest, CustomPlanOverrideRequest, EvalQuestion, EvalRunRequest,
     LeadOutcomeUpdate, ByodConnectionRequest, ByodProvisionRequest,
     ByodRequestChangeRequest, TeaserEventRequest, TeaserSuggestRequest,
-    FeedbackRequest,
+    FeedbackRequest, CoaEventRequest,
 )
 from services import teaser as teaser_service  # Contextual teaser (Phase 1)
 
@@ -6424,22 +6424,90 @@ def _coa_folder_for(company: dict) -> str:
     return effective_coa_config(coerce_overrides(company.get("pack_overrides")))
 
 
+def _coa_fields_shape(product: Optional[str], batch: Optional[str]) -> Optional[str]:
+    """Which of the two boxes carried a value — 'product_only' | 'batch_only' |
+    'both', or ``None`` for the legacy single-box ``q=`` (coa-split-lookup-fields-
+    plan Phase 5). Shape only: the identifiers themselves never reach this."""
+    has_product = bool((product or "").strip())
+    has_batch = bool((batch or "").strip())
+    if has_product and has_batch:
+        return "both"
+    if has_product:
+        return "product_only"
+    if has_batch:
+        return "batch_only"
+    return None
+
+
+def _log_coa_event(company_id: str, source: str, outcome: str,
+                   fields: Optional[str] = None) -> None:
+    """Fire-and-forget shape-only analytics row (coa-split-lookup-fields-plan
+    Phase 5, §7). ``outcome`` is 'strict' | 'tolerant' | 'refused' |
+    'contact_support'; ``fields`` is which box(es) carried a value, or ``None``
+    for a legacy ``q=`` call or a support click (which has no fields of its own).
+
+    Certificates are confidential and `get_coa` is `restricted=True` (§6), so this
+    never carries an identifier, a filename, or a count — counting shapes is fine,
+    storing what a visitor typed is not.
+
+    Unlike the `teaser_events` insert above, this runs INSIDE the actual lookup
+    path (`search_coa` / `_run_get_coa`), not a dedicated beacon endpoint — so even
+    `get_db_connection()` itself must not be allowed to raise here. A pool error
+    would otherwise turn an analytics failure into a broken certificate lookup,
+    which is exactly what "analytics must never break the widget" forbids.
+    """
+    try:
+        conn = get_db_connection()
+    except Exception as e:
+        logger.warning(f"coa-lookup-event insert failed for company {company_id}: {e}")
+        return
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO coa_lookup_events (company_id, source, outcome, fields) "
+            "VALUES (%s, %s, %s, %s)",
+            (company_id, source, outcome, fields),
+        )
+        conn.commit()
+        cursor.close()
+    except Exception as e:
+        conn.rollback()
+        logger.warning(f"coa-lookup-event insert failed for company {company_id}: {e}")
+    finally:
+        release_db_connection(conn)
+
+
 @app.get("/api/widget/coa")
 @limiter.limit("30/minute", key_func=get_remote_address)  # per-IP burst guard
 @limiter.limit("60/minute")                                 # per-API-key ceiling
 async def search_coa(
     request: Request,
     q: Optional[str] = None,
+    product: Optional[str] = None,
+    batch: Optional[str] = None,
     visitor_id: Optional[str] = None,
     company: dict = Depends(verify_api_key_and_origin),
 ):
-    """Exact certificate lookup for the widget's COA panel (coa-confidential-access §4).
+    """Exact certificate lookup for the widget's COA panel (coa-confidential-access §4,
+    widened by coa-split-lookup-fields-plan §5).
 
-    Not a search. ``q`` must carry at least two tokens, every one of them must match a
-    filename token exactly, and exactly one certificate may survive — otherwise this
-    returns nothing at all. ``results`` therefore holds either one row or zero, and
-    the caller cannot distinguish "no such certificate" from "that matched two
-    hundred of them", because a visitor must not be able to either (C3).
+    Not a search. The query must carry at least two tokens, every one of them must
+    match a filename token exactly (or, on a strict miss, a product token may
+    tolerate a printed pack-size suffix — §5 step 6), and exactly one certificate may
+    survive — otherwise this returns nothing at all. ``results`` therefore holds
+    either one row or zero, and the caller cannot distinguish "no such certificate"
+    from "that matched two hundred of them", because a visitor must not be able to
+    either (C3).
+
+    Two ways to pass the query, both reaching the same resolver:
+
+    * ``product`` + ``batch`` — the two-field panel. Field-agnostic on the strict
+      pass (a swap still resolves) but only ``product`` gets the tolerant widening.
+    * ``q`` — the legacy single box, kept so a widget bundle already cached on a
+      customer's site keeps resolving byte-for-byte; it gets no tolerance (S9).
+
+    ``product``/``batch`` win when either is present, so a stray empty ``q`` on an
+    updated bundle can never mask them.
 
     Calls the SAME ``coa_drive.resolve`` as the ``get_coa`` agent tool, so the panel
     and the conversational path can never disagree about which certificate a query
@@ -6472,14 +6540,22 @@ async def search_coa(
     if retry_after:
         raise _coa_lockout(retry_after)
 
+    query = (coa_drive.CoaQuery.from_fields(product, batch) if (product or batch)
+              else coa_drive.CoaQuery.from_raw(q))
+
     try:
-        doc = await coa_drive.resolve(company["id"], folder_id, q, redis_client=r)
+        doc, shape = await coa_drive.resolve_with_shape(
+            company["id"], folder_id, query, redis_client=r)
     except coa_drive.CoaDriveError as e:
         logger.warning("COA search failed for company %s: %s", company["id"], e.reason)
         # NOT a miss. An outage is our failure, and counting it would lock out the
         # customers who kept trying during it, exactly when they need the handoff.
         raise HTTPException(status_code=503, detail={
             "code": "COA_UNAVAILABLE", "message": COA_UNAVAILABLE_MESSAGE})
+
+    # Phase 5 — shape only, logged after a real resolution happened (never on the
+    # early returns above, where nothing was actually looked up).
+    _log_coa_event(company["id"], "panel", shape, _coa_fields_shape(product, batch))
 
     if doc is None:
         earned = await coa_throttle.record_miss(
@@ -6493,6 +6569,28 @@ async def search_coa(
         "results": [coa_drive.to_payload(doc)] if doc else [],
         "configured": True,
     }
+
+
+@app.post("/api/widget/coa-event")
+@limiter.limit("30/minute", key_func=get_remote_address)  # per-IP: mirrors teaser-event
+@limiter.limit("300/minute")                               # per-API-key ceiling
+async def widget_coa_event(
+    request: Request,
+    body: CoaEventRequest,
+    company: dict = Depends(verify_api_key_and_origin),
+):
+    """Analytics sink for the COA panel's Contact-support button (Phase 5, §7).
+
+    The lookup shape itself (strict/tolerant/refused) is logged server-side in
+    `search_coa` / `_run_get_coa`, where it is already known — this is the one COA
+    event only the browser can see, fired when a visitor who reached the panel
+    clicks through to a human. Same fire-and-forget discipline as `teaser-event`:
+    a failure here must never surface to the visitor.
+    """
+    if body.source not in ("panel", "chat"):
+        raise HTTPException(status_code=400, detail="source must be 'panel' or 'chat'.")
+    _log_coa_event(company["id"], body.source, "contact_support")
+    return {"status": "ok"}
 
 
 # C3 through the conversation: "you gave me too little" and "that does not exist" are
@@ -6532,7 +6630,8 @@ async def _run_get_coa(company: dict, args: dict, *, visitor_id: Optional[str] =
     The ``_rows`` and ``_lockout`` keys are internal, stripped by the caller before the
     observation reaches the model — the same discipline ``_resolve_product`` uses.
     """
-    query = (args.get("query") or "").strip()
+    product_code = (args.get("product_code") or "").strip()
+    batch_number = (args.get("batch_number") or "").strip()
     folder_id = _coa_folder_for(company)
     if not folder_id:
         return {"status": "not_configured",
@@ -6545,18 +6644,26 @@ async def _run_get_coa(company: dict, args: dict, *, visitor_id: Optional[str] =
         return {"status": "locked_out", "_lockout": retry_after,
                 "message": _COA_LOCKED_OUT_MESSAGE}
 
-    if not query:
+    if not product_code and not batch_number:
         # Folded into not_found (§7). Nothing was looked up, so this costs the visitor
         # nothing — but the model must not learn that its own empty call is a distinct
         # outcome, or it will say so.
         return {"status": "not_found", "message": _COA_NOT_FOUND_MESSAGE}
 
+    query = coa_drive.CoaQuery.from_fields(product_code, batch_number)
+
     try:
-        doc = await coa_drive.resolve(company["id"], folder_id, query, redis_client=r)
+        doc, shape = await coa_drive.resolve_with_shape(
+            company["id"], folder_id, query, redis_client=r)
     except coa_drive.CoaDriveError as e:
         logger.warning("COA tool failed for company %s: %s", company["id"], e.reason)
         # H15 — a Drive outage is NOT "no certificate exists", and it is not a miss.
         return {"status": "unavailable", "message": COA_UNAVAILABLE_MESSAGE}
+
+    # Phase 5 — same shape-only event the panel logs, tagged 'chat' so the two
+    # paths' outcomes can be compared.
+    _log_coa_event(company["id"], "chat", shape,
+                   _coa_fields_shape(product_code, batch_number))
 
     if doc is None:
         # The SAME counters the panel uses. Two independent allowances would make the

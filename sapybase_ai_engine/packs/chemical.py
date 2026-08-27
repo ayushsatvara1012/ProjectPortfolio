@@ -107,20 +107,29 @@ get_coa = ToolSpec(
         "Look up a Certificate of Analysis (COA) for a specific BATCH the visitor "
         "already has — they read the codes off a drum, label or invoice. This is an "
         "exact lookup, not a search: it releases the one certificate the identifiers "
-        "name, or nothing at all. Pass ONLY the identifiers themselves as `query` — "
-        "the codes and numbers, separated by spaces, with every ordinary word "
-        "removed. From 'I have a drum of acetone, batch 100.26R016, grade 100RG' pass "
-        "'100RG 100.26R016'. Never pass the visitor's sentence, never invent or "
-        "complete an identifier they did not give you, and never guess a batch. If "
-        "they have given only one identifier, ask for the other before calling this. "
-        "Never list filenames, never state a result, and never paste a link — the "
-        "certificate opens in a panel. A COA reports one batch's tested values: it is "
-        "NOT a safety sheet (use get_sds) and NOT a product spec (use get_product_spec)."
+        "name, or nothing at all. Pass ONLY the identifiers themselves — the codes "
+        "and numbers, with every ordinary word removed — as the two slots below. "
+        "Pass the product code EXACTLY as the visitor read it, including any "
+        "trailing pack-size characters (a litre or millilitre suffix and similar) — "
+        "never shorten it or guess where the product code ends; that judgment "
+        "belongs to the lookup, not to you. From 'I have a drum of acetone, batch "
+        "100.26R016, grade 100RG' pass product_code='100RG' and "
+        "batch_number='100.26R016'. Never pass the visitor's sentence, never invent "
+        "or complete an identifier they did not give you, and never guess a batch. "
+        "If they have given only one identifier, ask for the other before calling "
+        "this. Never list filenames, never state a result, and never paste a link — "
+        "the certificate opens in a panel. A COA reports one batch's tested values: "
+        "it is NOT a safety sheet (use get_sds) and NOT a product spec (use "
+        "get_product_spec)."
     ),
     slots=(
-        Slot("query", required=True,
-             description=("Only the identifiers the visitor read out — product code and "
-                          "batch number, space-separated, with no other words.")),
+        Slot("product_code", required=True,
+             description=("The product code the visitor read out, EXACTLY as printed — "
+                          "including any trailing pack-size characters. Never shorten it "
+                          "or guess where the product code ends.")),
+        Slot("batch_number", required=True,
+             description=("The batch number the visitor read out, dots and all, exactly "
+                          "as printed.")),
     ),
     # Certificates are confidential (docs/coa-confidential-access-plan.md), so a
     # turn that used this tool can never become public FAQ schema.

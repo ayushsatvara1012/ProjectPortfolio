@@ -20,6 +20,7 @@ import pytest
 from services import coa_drive
 from services.coa_drive import (
     CoaDriveError,
+    CoaQuery,
     build_document,
     dedupe,
     display_name,
@@ -346,6 +347,144 @@ class TestLookupConstraints:
         # "16 matched" tells someone probing that acetone exists and they are close.
         assert lookup(library, "100.26R016") is None    # three matched
         assert lookup(library, "ZZZZ QQQQ") is None     # none matched
+
+
+class TestCoaQueryTolerantMatching:
+    """coa-split-lookup-fields-plan §5 — the two-field query and the tolerant pass
+    that lets a printed PACK code (`100RG025L`) resolve a certificate filed under
+    the shorter PRODUCT code (`100RG`)."""
+
+    def test_exact_two_field_query_still_resolves_on_the_strict_pass(self, library):
+        # The baseline: nothing about adding fields should change the exact case.
+        assert name_of(lookup(library, CoaQuery.from_fields("100RG", "100.26R016"))) == (
+            "100RG_100.26R016_ACETONE RG.pdf")
+
+    def test_pack_code_with_size_suffix_resolves_via_the_tolerant_pass(self, library):
+        # 100RG/100PU/100LR all share batch 100.26R016 (F1) — a strict match on the
+        # padded pack code fails for ALL THREE, so this only resolves if the
+        # tolerant pass narrows correctly to the one whose product token prefixes
+        # what was typed.
+        released = lookup(library, CoaQuery.from_fields("100RG025L", "100.26R016"))
+        assert name_of(released) == "100RG_100.26R016_ACETONE RG.pdf"
+
+    def test_a_different_pack_size_on_the_same_family_still_narrows_correctly(self, library):
+        released = lookup(library, CoaQuery.from_fields("100LR200L", "100.26R016"))
+        assert name_of(released) == "100LR_100.26R016_ACETONE LR.pdf"
+
+    def test_the_hplc_ampersand_fixture_tolerates_a_pack_code_too(self, library):
+        released = lookup(library, CoaQuery.from_fields("101HPLC2500M", "101.26R001"))
+        assert name_of(released) == "101HPLC_101.26R001_ACETONITRILE  HPLC & SPEC.pdf"
+
+    def test_swapped_fields_still_resolve(self, library):
+        # S3 — the strict pass pools both fields field-agnostically, so a customer
+        # who puts the batch in the product box and vice versa is unaffected.
+        released = lookup(library, CoaQuery.from_fields("101.26R001", "101HPLC"))
+        assert name_of(released) == "101HPLC_101.26R001_ACETONITRILE  HPLC & SPEC.pdf"
+
+    def test_wrong_batch_is_never_rescued_by_a_tolerated_product(self, library):
+        # The batch stays exact even inside the tolerant pass — it is the entropy,
+        # and tolerating it could release the WRONG certificate.
+        assert lookup(library, CoaQuery.from_fields("100RG025L", "100.26R999")) is None
+
+    def test_reverse_direction_is_refused_even_with_a_matching_batch(self, library):
+        # A SHORT query product must not prefix-match a LONGER document token —
+        # that is the `EP` → 48-certificates shape coa-confidential-access §4
+        # deleted, and it must not come back through this door. `ACET` is shorter
+        # than the document's `ACETONE` token, so this must refuse even though the
+        # batch alone matches three real certificates.
+        assert lookup(library, CoaQuery.from_fields("ACET", "100.26R016")) is None
+
+    def test_a_three_character_document_token_never_qualifies_for_prefix_matching(self):
+        # MIN_PREFIX_DOC_TOKEN floor — a bare `100` (3 chars) must not prefix-match
+        # a padded pack code on its own, or every product in a `100…` family would
+        # tolerant-match every other family's pack code.
+        short_token_doc = build_document(entry("100_100.26R777_SHORT TOKEN.pdf"))
+        assert lookup([short_token_doc], CoaQuery.from_fields("100RG025L", "100.26R777")) is None
+
+    def test_ambiguous_strict_result_never_falls_through_to_the_tolerant_pass(self):
+        # Two DIFFERENT certificates that both satisfy the strict pass must refuse —
+        # even though a naive implementation might keep widening until only one
+        # tolerant survivor remains, that must never happen once strict already
+        # found something.
+        pair = dedupe([
+            build_document(entry("100RG_100.26R016_ACETONE RG.pdf",
+                                 modified="2026-01-04T09:00:00.000Z")),
+            build_document(entry("100RG_100.26R016_ACETONE RG GRADE II.pdf",
+                                 modified="2026-07-04T09:00:00.000Z")),
+        ])
+        assert lookup(pair, CoaQuery.from_fields("100RG", "100.26R016")) is None
+
+    def test_batch_alone_still_refused_with_an_empty_product_field(self, library):
+        # No product tokens at all → the tolerant guard never engages, matching the
+        # existing "batch spans grades" refusal exactly.
+        assert lookup(library, CoaQuery.from_fields("", "100.26R016")) is None
+
+    def test_from_raw_matches_the_legacy_single_box_behaviour_exactly(self, library):
+        # The widget bundle already deployed on customer sites still sends `q=`.
+        assert name_of(lookup(library, CoaQuery.from_raw("100RG 100.26R016"))) == (
+            "100RG_100.26R016_ACETONE RG.pdf")
+
+    def test_from_raw_gets_no_tolerance(self, library):
+        # A legacy raw query has no product field to widen (from_raw puts every
+        # token in batch_tokens), so a padded pack code must NOT resolve through
+        # the single-box path — only the two-field panel and tool can supply one.
+        assert lookup(library, CoaQuery.from_raw("100RG025L 100.26R016")) is None
+
+    def test_plain_strings_still_work_everywhere_lookup_is_called(self, library):
+        # _coerce_query — every existing raw-string caller (this whole file, and
+        # main.py before Phase 2 wires the new params) must keep working unchanged.
+        assert name_of(lookup(library, "100RG 100.26R016")) == (
+            "100RG_100.26R016_ACETONE RG.pdf")
+
+
+class TestMatchShape:
+    """coa-split-lookup-fields-plan Phase 5 — `_matches_by_pass` labels WHICH pass
+    produced a match list ('strict' | 'tolerant'), which is what lets the endpoint
+    and the `get_coa` tool log the SHAPE of a lookup without ever touching a count
+    or a filename (C3 still withholds both — a pass name reveals neither)."""
+
+    def test_an_exact_match_is_labelled_strict(self, library):
+        docs, pass_name = coa_drive._matches_by_pass(
+            library, CoaQuery.from_fields("100RG", "100.26R016"))
+        assert len(docs) == 1 and pass_name == "strict"
+
+    def test_a_padded_pack_code_is_labelled_tolerant(self, library):
+        docs, pass_name = coa_drive._matches_by_pass(
+            library, CoaQuery.from_fields("100RG025L", "100.26R016"))
+        assert len(docs) == 1 and pass_name == "tolerant"
+
+    def test_a_miss_with_no_product_field_is_labelled_strict(self, library):
+        # _matches_by_pass always names a pass — collapsing "zero or many" to the
+        # caller-safe "refused" is resolve_with_shape's job, not this one's. With
+        # no product tokens to widen, the tolerant pass never engages, so a miss
+        # here still carries "strict".
+        docs, pass_name = coa_drive._matches_by_pass(
+            library, CoaQuery.from_fields("", "QQQQ"))
+        assert docs == [] and pass_name == "strict"
+
+    def test_a_miss_with_a_product_field_falls_through_to_tolerant(self, library):
+        # The mirror case: once there IS a product field, a strict miss always
+        # tries the tolerant pass — so a miss here carries "tolerant" even though
+        # nothing was released either way.
+        docs, pass_name = coa_drive._matches_by_pass(
+            library, CoaQuery.from_fields("ZZZZ", "QQQQ"))
+        assert docs == [] and pass_name == "tolerant"
+
+    def test_an_ambiguous_strict_result_is_still_labelled_strict(self):
+        pair = dedupe([
+            build_document(entry("100RG_100.26R016_ACETONE RG.pdf",
+                                 modified="2026-01-04T09:00:00.000Z")),
+            build_document(entry("100RG_100.26R016_ACETONE RG GRADE II.pdf",
+                                 modified="2026-07-04T09:00:00.000Z")),
+        ])
+        docs, pass_name = coa_drive._matches_by_pass(
+            pair, CoaQuery.from_fields("100RG", "100.26R016"))
+        assert len(docs) == 2 and pass_name == "strict"
+
+    def test_matches_stays_a_thin_wrapper_that_drops_the_pass(self, library):
+        docs, _pass = coa_drive._matches_by_pass(
+            library, CoaQuery.from_fields("100RG025L", "100.26R016"))
+        assert coa_drive._matches(library, CoaQuery.from_fields("100RG025L", "100.26R016")) == docs
 
 
 class TestConventionIndependence:

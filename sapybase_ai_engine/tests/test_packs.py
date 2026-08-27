@@ -77,13 +77,16 @@ class TestChemicalPack:
         for name in ("get_sds", "get_coa", "get_product_spec", "request_quote", "request_sample"):
             assert isinstance(CHEMICAL_PACK.get_tool(name), ToolSpec)
 
-    def test_coa_tool_takes_the_visitors_words_verbatim(self):
-        # COA finder D2 — there is no code/batch/grade split here on purpose. The
-        # whole design rests on NOT deciding which token means what, so a slot per
-        # field would reintroduce the filename grammar the plan rejects.
+    def test_coa_tool_has_the_same_two_slots_as_the_panel(self):
+        # coa-split-lookup-fields-plan §5.2/Phase 4 (S1/S8) reverses D2's single-box
+        # design: the tool now gets the SAME two slots as the panel, so the chat and
+        # panel paths cannot disagree about which certificate an identifier pair
+        # names (C6). Neither slot is parsed against a filename — both are pooled
+        # field-agnostically on the strict pass (S3) — so this is not the filename
+        # grammar the plan rejects.
         tool = CHEMICAL_PACK.get_tool("get_coa")
-        assert {s.name for s in tool.slots} == {"query"}
-        assert tool.slots[0].required is True
+        assert {s.name for s in tool.slots} == {"product_code", "batch_number"}
+        assert all(s.required for s in tool.slots)
 
     def test_coa_tool_is_distinguished_from_sds_and_spec(self):
         # A COA reports one batch's tested values; conflating it with the safety

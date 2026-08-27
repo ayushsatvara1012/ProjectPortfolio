@@ -29,11 +29,13 @@ def _capture(args: dict, obs: dict) -> dict:
         return {}
     rows = obs.get("_rows")
     if rows is not None:
+        product_code = (args.get("product_code") or "").strip()
+        batch_number = (args.get("batch_number") or "").strip()
         return {
             "coa": {
                 "status": obs.get("status"),
                 "results": rows,
-                "query": (args.get("query") or "").strip(),
+                "query": " ".join(t for t in (product_code, batch_number) if t),
             }
         }
     lockout = obs.get("_lockout")
