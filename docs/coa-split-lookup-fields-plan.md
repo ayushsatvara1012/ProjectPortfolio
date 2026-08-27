@@ -6,12 +6,21 @@ Reads with: `docs/coa-finder-plan.md` (§7 matching), `docs/coa-confidential-acc
 
 ## 0. Status - 2026-08-27
 
-**Phases 1-5 code BUILT and Phase 5's migration APPLIED to the control DB
-(2026-08-27).** One thing left for the owner: Phase 4's live-agent check (§7
-Phase 4 - needs a real LLM call and a real Google Drive folder, the owner is
-running this themselves).
-Branch created off `MainV2`.
-Uncommitted: `sapybase_ai_engine/services/coa_drive.py`, `sapybase_ai_engine/main.py`, `sapybase_ai_engine/packs/chemical.py`, `sapybase_ai_engine/services/agent_runtime/tools/get_coa.py`, `sapybase_ai_engine/db/models.py`, `sapybase_ai_engine/alembic_migrations/versions/0039_company_knowledge_context.py`, `sapybase_ai_engine/alembic_migrations/versions/0040_coa_lookup_events.py`, `sapybase_ai_engine/tests/test_coa_drive.py`, `sapybase_ai_engine/tests/test_coa_endpoint.py`, `sapybase_ai_engine/tests/test_agent.py`, `sapybase_ai_engine/tests/test_agent_runtime_registry.py`, `sapybase_ai_engine/tests/test_packs.py`, `src/components/chat/ChatWidget.tsx`, `src/__tests__/coa-picker.test.tsx`, `src/__tests__/chatwidget_coa_event.test.ts`, this plan doc.
+**Phases 1-5 code BUILT, Phase 5's migration APPLIED to the control DB, and the
+branch is rebased onto current `MainV2` and ready to merge (2026-08-27).** One
+thing left for the owner: Phase 4's live-agent check (§7 Phase 4 - needs a
+real LLM call and a real Google Drive folder, the owner is running this
+themselves).
+Branch created off `MainV2`. Two commits: `af45e6af` (migration 0040, its own
+commit per convention) and `70c78c4c` (everything else). Rebased cleanly onto
+`origin/MainV2` (which had advanced 2 commits - PR #122/#123, structure-aware
+chunking - with zero line-level overlap against every COA file; confirmed
+before rebasing, and the rebase needed no conflict resolution). Diff against
+`MainV2` is exactly 15 files, all COA-related, 1492/-160 - nothing from the
+upstream work leaked in as "ours." Suite green post-rebase: backend 2816
+passed/138 skipped (COA's 2754/134 combined with upstream's new chunking
+tests), frontend 640/640, tsc clean.
+Committed: `af45e6af` and `70c78c4c` (see above). Nothing outstanding.
 
 **Migration numbering note**: `coa_lookup_events` was drafted as `0039` and had
 to be renumbered to `0040` before applying - the control DB's `alembic_version`
