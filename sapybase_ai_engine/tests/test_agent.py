@@ -1104,10 +1104,12 @@ class TestSchemasAndDirective:
         by_name = {s["name"]: s for s in schemas}
         assert set(by_name) == {"get_sds", "get_coa", "get_product_spec",
                                 "request_quote", "request_sample"}
-        # get_coa is the one tool with a hard-required slot: without something the
+        # get_coa is the one tool with hard-required slots: without something the
         # visitor typed there is nothing to search, and D1 forbids listing the folder.
-        assert set(by_name["get_coa"]["parameters"]["properties"]) == {"query"}
-        assert by_name["get_coa"]["parameters"]["required"] == ["query"]
+        assert set(by_name["get_coa"]["parameters"]["properties"]) == {
+            "product_code", "batch_number"}
+        assert set(by_name["get_coa"]["parameters"]["required"]) == {
+            "product_code", "batch_number"}
         # The two read-only tools take CAS or name, plus an optional grade to
         # disambiguate the many-grades-per-product case (none individually required).
         for name in ("get_sds", "get_product_spec"):

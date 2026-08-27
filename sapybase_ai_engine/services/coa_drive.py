@@ -118,6 +118,12 @@ MIN_FINDABLE_TOKENS = 2
 # used to drive has nothing left to describe.
 MIN_QUERY_TOKENS = 2
 
+# coa-split-lookup-fields-plan §5 step 6. A document token shorter than this
+# prefix-matches almost anything a customer might type (`101` prefixes half a
+# product line), so it is excluded from the tolerant pass entirely — a noise floor,
+# not a claim about what a product code looks like (D2 still applies).
+MIN_PREFIX_DOC_TOKEN = 4
+
 # Everything that separates one meaningful chunk of a filename from the next. The
 # whole point is that we do NOT care which chunk means what.
 #
@@ -374,6 +380,63 @@ def thin_documents(documents: Iterable[CoaDocument]) -> List[CoaDocument]:
 
 # ─────────────────────────────── pure: search ───────────────────────────────
 
+@dataclass(frozen=True)
+class CoaQuery:
+    """A certificate lookup, tokenized per field (coa-split-lookup-fields-plan §5).
+
+    ``product_tokens`` and ``batch_tokens`` are matched by DIFFERENT rules. The
+    strict pass (:func:`_hits`) pools both fields and requires exact equality —
+    field-agnostic, so a customer who puts the batch in the product box still
+    resolves, exactly as the single-box query always has. The tolerant pass
+    (:func:`_hits_tolerant`) runs only when the strict pass finds nothing, and
+    widens ``product_tokens`` alone: a printed pack code carries a size suffix
+    (`101LR025L`) that a certificate's filename never does (`101LR`). The batch
+    keeps the exact rule always — it is the entropy, and a tolerant batch could
+    release the WRONG certificate, not just fail to release the right one.
+
+    Immutable, like :class:`CoaDocument` — a query is a snapshot of what was
+    typed, not something later code should be able to mutate underneath a caller.
+    """
+
+    product_tokens: Tuple[str, ...] = ()
+    batch_tokens: Tuple[str, ...] = ()
+
+    @classmethod
+    def from_fields(cls, product: Any, batch: Any) -> "CoaQuery":
+        """The two-box panel and the ``get_coa`` tool's two slots."""
+        return cls(product_tokens=tokenize(product), batch_tokens=tokenize(batch))
+
+    @classmethod
+    def from_raw(cls, raw: Any) -> "CoaQuery":
+        """The legacy single-box ``q=`` — a widget bundle already cached on a
+        customer's site sends this and must keep resolving byte-for-byte.
+
+        Every token lands in ``batch_tokens``, never ``product_tokens``. Pooled
+        into the strict pass that is identical either way, but with
+        ``product_tokens`` empty the tolerant pass has nothing to widen and can
+        never trigger (see the guard in :func:`_matches`) — a cached bundle must
+        not silently gain a tolerance it has no field to express.
+        """
+        return cls(batch_tokens=tokenize(raw))
+
+    @property
+    def pooled_tokens(self) -> Tuple[str, ...]:
+        """Every token from both fields — the strict pass does not care which
+        field a token came from, only that every one of them matched (§5 step 2-4)."""
+        return self.product_tokens + self.batch_tokens
+
+
+def _coerce_query(query: Any) -> CoaQuery:
+    """Accept a :class:`CoaQuery` as-is, or wrap anything else via ``from_raw``.
+
+    Keeps every existing caller — the endpoint's current ``q=``, the old agent
+    tool call, every raw-string test — working unchanged while the two-pass logic
+    below lands. Mirrors ``coerce_overrides`` in ``packs/overrides.py``: normalize
+    once at the boundary rather than asking every caller to know the new type.
+    """
+    return query if isinstance(query, CoaQuery) else CoaQuery.from_raw(query)
+
+
 def _hits(query_token: str, doc: CoaDocument) -> bool:
     """Does one query token match this file? Exactly, or not at all (§4 step 3).
 
@@ -389,22 +452,83 @@ def _hits(query_token: str, doc: CoaDocument) -> bool:
     return query_token in doc.tokens or numeric_key(query_token) in doc.numeric_tokens
 
 
+def _hits_tolerant(query_token: str, doc: CoaDocument) -> bool:
+    """Does one PRODUCT token match this file, tolerating a printed pack-size
+    suffix the filename never carries (coa-split-lookup-fields-plan §5 step 6)?
+
+    Exact still counts (everything :func:`_hits` accepts still passes here). Beyond
+    that, one extra shape is tolerated: a document token of at least
+    ``MIN_PREFIX_DOC_TOKEN`` characters that is a PREFIX of the query token —
+    `101LR` (in the filename) prefixing `101LR025L` (typed off the drum).
+
+    One-directional on purpose, and this is the part that must never drift. `EP`
+    matching `EPICHLOROHYDRIN` — a short QUERY prefixing a long DOCUMENT token — is
+    the browsable-index behaviour coa-confidential-access §4 deleted (it is what let
+    `EP` return 48 certificates). This function only ever tolerates the customer
+    supplying MORE characters than the file holds, never fewer, so it can rescue an
+    over-specified query and cannot turn a short probe into a list.
+    """
+    if _hits(query_token, doc):
+        return True
+    return any(
+        len(t) >= MIN_PREFIX_DOC_TOKEN and query_token.startswith(t)
+        for t in doc.tokens
+    )
+
+
+def _matches_by_pass(documents: Sequence[CoaDocument], query: Any) -> Tuple[List[CoaDocument], str]:
+    """Same two-pass logic :func:`_matches` exposes, plus WHICH pass produced the
+    list — ``"strict"`` or ``"tolerant"`` (coa-split-lookup-fields-plan §5, Phase 5).
+
+    The pass name is not a new fact about the certificate library; it is already
+    implicit in which branch below ran. Surfacing it is what lets
+    :func:`resolve_with_shape` log the SHAPE of a lookup (which pass released it,
+    or that nothing did) without ever touching a count or a filename — the two
+    things C3 withholds from a visitor stay withheld; a pass name alone reveals
+    neither how many documents exist nor which one matched.
+
+    Two passes, in order:
+
+    1. **Strict** (§4 steps 1-4, unchanged): pool every token from both fields —
+       field-agnostic, so a swapped product/batch still resolves — and keep
+       documents where EVERY pooled token matches exactly. If this finds anything
+       at all, even an ambiguous set, it is the final answer: an ambiguous strict
+       result must never fall through to the tolerant pass and get resolved by it.
+    2. **Tolerant** (§5 step 6): only reached on a strict MISS, and only when the
+       query actually has a product field to widen. Batch tokens keep the exact
+       rule even here — tolerating the batch could release the WRONG certificate,
+       not just fail to release the right one.
+    """
+    query = _coerce_query(query)
+    pooled = query.pooled_tokens
+    # H6 — "every query token must match" is VACUOUSLY TRUE for zero tokens, so an
+    # unguarded query of "___" would match the entire folder. The floor closes that
+    # and enforces §4's two-part rule in one check, but only AFTER tokenizing: "___"
+    # is three characters and no tokens, so counting characters would not catch it.
+    if len(pooled) < MIN_QUERY_TOKENS:
+        return [], "strict"
+    strict = [d for d in documents if all(_hits(t, d) for t in pooled)]
+    if strict or not query.product_tokens:
+        return strict, "strict"
+    tolerant = [
+        d for d in documents
+        if all(_hits(t, d) for t in query.batch_tokens)
+        and all(_hits_tolerant(t, d) for t in query.product_tokens)
+    ]
+    return tolerant, "tolerant"
+
+
 def _matches(documents: Sequence[CoaDocument], query: Any) -> List[CoaDocument]:
-    """Every document matching EVERY token of the query exactly (§4 steps 1-4).
+    """Every document this query identifies — strict first, tolerant only on a
+    strict miss (coa-split-lookup-fields-plan §5).
 
     Module-private, and that is the point. The NUMBER of matches is exactly the fact
     C3 withholds from the visitor — "16 certificates matched" tells someone probing
     that acetone exists and that they are close — so it must not leave this module.
     Only :func:`resolve` sees it, and only to decide whether a re-walk could help.
     """
-    query_tokens = tokenize(query)
-    # H6 — "every query token must match" is VACUOUSLY TRUE for zero tokens, so an
-    # unguarded query of "___" would match the entire folder. The floor closes that
-    # and enforces §4's two-part rule in one check, but only AFTER tokenizing: "___"
-    # is three characters and no tokens, so counting characters would not catch it.
-    if len(query_tokens) < MIN_QUERY_TOKENS:
-        return []
-    return [d for d in documents if all(_hits(t, d) for t in query_tokens)]
+    docs, _pass = _matches_by_pass(documents, query)
+    return docs
 
 
 def lookup(documents: Sequence[CoaDocument], query: Any) -> Optional[CoaDocument]:
@@ -423,6 +547,10 @@ def lookup(documents: Sequence[CoaDocument], query: Any) -> Optional[CoaDocument
     Still the ONE resolver. The panel endpoint and the ``get_coa`` agent tool both
     reach it through :func:`resolve`, so the conversational path and the panel can
     never disagree — the invariant ``_newest_https_row`` establishes for SDS.
+
+    ``query`` accepts either a :class:`CoaQuery` (the two-field callers) or
+    anything :func:`CoaQuery.from_raw` can wrap (the legacy single-box callers) —
+    :func:`_matches` does the coercion.
     """
     matches = _matches(documents, query)
     return matches[0] if len(matches) == 1 else None
@@ -1175,24 +1303,59 @@ async def resolve(
     Beyond the gate a miss simply answers from cache, and the caller hands off. That
     is the correct outcome and not a degradation: the visitor's batch is almost never
     a file uploaded in the last sixty seconds.
+
+    ``query`` accepts a :class:`CoaQuery` from the two-field callers, or a plain
+    value (the legacy ``q=`` string) that :func:`_matches` coerces via
+    :func:`CoaQuery.from_raw` — see coa-split-lookup-fields-plan §5.2.
+    """
+    doc, _shape = await resolve_with_shape(
+        company_id, folder_id, query, redis_client=redis_client, api_key=api_key, client=client)
+    return doc
+
+
+def _one(docs: List[CoaDocument], pass_name: str) -> Tuple[Optional[CoaDocument], str]:
+    """Collapse a match list to the single-document contract (§4 step 5) plus its
+    shape: the pass that released it, or ``"refused"`` for zero or many."""
+    return (docs[0], pass_name) if len(docs) == 1 else (None, "refused")
+
+
+async def resolve_with_shape(
+    company_id: Any,
+    folder_id: str,
+    query: Any,
+    *,
+    redis_client: Any = None,
+    api_key: str = "",
+    client: Optional[httpx.AsyncClient] = None,
+) -> Tuple[Optional[CoaDocument], str]:
+    """Same resolution as :func:`resolve`, plus WHICH PASS released it — ``"strict"``,
+    ``"tolerant"``, or ``"refused"`` (coa-split-lookup-fields-plan Phase 5, §7).
+
+    This is the only new surface Phase 5 needed: the shape falls out of matching that
+    already happens, not a second walk or a second query. :func:`resolve` is a thin
+    wrapper over this that drops the shape, so every existing caller and test keeps
+    its single-value contract; the widget endpoint and the ``get_coa`` tool call this
+    instead so their shape-only analytics rows describe the SAME resolution the
+    visitor actually experienced.
     """
     result, from_cache = await load_index(
         company_id, folder_id, redis_client=redis_client, api_key=api_key, client=client)
-    matches = _matches(result.documents, query)
+    docs, pass_name = _matches_by_pass(result.documents, query)
     # Only a query that matched NOTHING can be helped by walking again. An ambiguous
     # query has already found its documents — a re-walk returns the same ones and
     # refuses again — so testing "did we release a certificate" here instead of "did
     # anything match" would spend a Drive walk on every `acetone` a visitor types.
-    if matches or not from_cache:
-        return matches[0] if len(matches) == 1 else None
+    if docs or not from_cache:
+        return _one(docs, pass_name)
 
     if not await forced_walk_allowed(company_id, redis_client):
-        return None
+        return None, "refused"
 
     refreshed, _ = await load_index(
         company_id, folder_id, redis_client=redis_client, api_key=api_key,
         client=client, force=True)
-    return lookup(refreshed.documents, query)
+    docs, pass_name = _matches_by_pass(refreshed.documents, query)
+    return _one(docs, pass_name)
 
 
 def folder_report(result: WalkResult) -> Dict[str, Any]:

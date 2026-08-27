@@ -1324,18 +1324,20 @@ function CoaSupportButton({ sent, onClick }: { sent: boolean; onClick: () => voi
   );
 }
 
-export function CoaPicker({ result, refused, searching, lockedOut, configured, error, query, themeColor, fromChat, supportSent, onQueryChange, onSubmit, onCancel, onContactSupport }: {
+export function CoaPicker({ result, refused, searching, lockedOut, configured, error, product, batch, themeColor, fromChat, supportSent, onProductChange, onBatchChange, onSubmit, onCancel, onContactSupport }: {
   result: CoaRow | null;
   refused: boolean;
   searching: boolean;
   lockedOut: boolean;
   configured: boolean;
   error: string | null;
-  query: string;
+  product: string;
+  batch: string;
   themeColor: string;
   fromChat: boolean;
   supportSent: boolean;
-  onQueryChange: (q: string) => void;
+  onProductChange: (v: string) => void;
+  onBatchChange: (v: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
   onContactSupport: () => void;
@@ -1349,6 +1351,12 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
   // whatever this shows. It exists so a customer can SEE that the lookup has stopped
   // answering, instead of typing into a box that silently cannot help them.
   const inputDisabled = lockedOut || !configured;
+  // coa-split-lookup-fields-plan §5.2 — Request must never be stricter than the
+  // lookup behind it. A dotted batch alone already resolves some certificates on
+  // its own (it tokenizes to two parts), so either field having content is enough
+  // to submit; the backend, not this button, decides whether it resolves.
+  const fieldClass = "flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:cursor-not-allowed disabled:opacity-60";
+  const fieldWrapClass = "flex items-center gap-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 px-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500";
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-800 shrink-0">
@@ -1365,34 +1373,35 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
       <form
         onSubmit={e => { e.preventDefault(); onSubmit(); }}
         className="px-3.5 pt-3 pb-1 shrink-0">
-        <div className="flex items-stretch gap-2">
-          <div className="relative flex-1 min-w-0 flex items-center gap-1.5 rounded-l-full rounded-r-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 pl-3.5 pr-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500">
-            <input value={query} onChange={e => onQueryChange(e.target.value)} autoFocus
-              disabled={inputDisabled}
-              placeholder="e.g. 100RG 100.26R016" aria-label="Product code and batch number"
-              className="flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:cursor-not-allowed disabled:opacity-60" />
-            {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
-          </div>
-          <button type="submit" disabled={inputDisabled || searching || !query.trim()}
-            className="shrink-0 px-4 py-2 rounded-l-xl rounded-r-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
-            style={{ backgroundColor: themeColor }}>
-            Request
-          </button>
+        <div className="flex flex-col gap-2">
+          <label className="flex flex-col gap-1">
+            <span className="px-1 text-[11px] font-google font-semibold text-slate-500 dark:text-slate-400">Product code</span>
+            <div className={fieldWrapClass}>
+              <input value={product} onChange={e => onProductChange(e.target.value)} autoFocus
+                disabled={inputDisabled}
+                placeholder="e.g. 100RG" aria-label="Product code"
+                className={fieldClass} />
+            </div>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="px-1 text-[11px] font-google font-semibold text-slate-500 dark:text-slate-400">Batch number</span>
+            <div className={fieldWrapClass}>
+              <input value={batch} onChange={e => onBatchChange(e.target.value)}
+                disabled={inputDisabled}
+                placeholder="e.g. 100.26R016" aria-label="Batch number"
+                className={fieldClass} />
+              {searching && <div className="w-3.5 h-3.5 border-2 border-slate-300 dark:border-slate-600 border-t-slate-500 dark:border-t-slate-300 rounded-full animate-spin shrink-0" aria-hidden="true" />}
+            </div>
+          </label>
         </div>
-        {/* There are no field labels to carry the format, so this does (§6). */}
-        <p className="pt-1.5 px-1 text-[11.5px] font-google text-slate-400 dark:text-slate-500 leading-snug">
-          Enter your product code and batch number, exactly as printed on your drum, label or invoice.
+        <button type="submit" disabled={inputDisabled || searching || (!product.trim() && !batch.trim())}
+          className="mt-2 w-full px-4 py-2 rounded-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+          style={{ backgroundColor: themeColor }}>
+          Request certificate
+        </button>
+        <p className="pt-1.5 px-1 text-[11px] font-google text-slate-400 dark:text-slate-500 leading-snug">
+          Copy both exactly as printed on your drum, label or invoice — including any extra characters after the product code, like a pack size.
         </p>
-        {/* Search is exact-token matching (services/coa_drive.py MIN_QUERY_TOKENS),
-            so the space between code and batch is what lets it recognize both. */}
-        <div className="pt-1.5 px-1 text-[11px] font-google text-slate-400 dark:text-slate-500 leading-snug">
-          <p>Type both, with a space between them — the order doesn&apos;t matter, just make sure there&apos;s a space and not a dash, slash or comma. For example:</p>
-          <ul className="mt-0.5 space-y-0.5 text-slate-500 dark:text-slate-400">
-            <li>ABC-2201 L045B</li>
-            <li>B23.0456 7X100RG</li>
-            <li>PRD450 BATCH19K</li>
-          </ul>
-        </div>
       </form>
 
       <div className="flex-1 overflow-y-auto px-3.5 py-3 scrollbar-thin [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -1926,7 +1935,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // it returns their certificate or nothing at all. `coaConfigured` tracks the
   // endpoint telling us the folder went away since /api/config was cached.
   const [coaPickerOpen, setCoaPickerOpen] = useState(false);
-  const [coaQuery, setCoaQuery] = useState('');
+  const [coaProduct, setCoaProduct] = useState('');
+  const [coaBatch, setCoaBatch] = useState('');
   const [coaResult, setCoaResult] = useState<CoaRow | null>(null);
   const [coaRefused, setCoaRefused] = useState(false);
   const [coaConfigured, setCoaConfigured] = useState(true);
@@ -2391,7 +2401,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     setActiveHubCard(null);
     closePanels();
     setHubView('chat');
-    setCoaQuery('');
+    setCoaProduct('');
+    setCoaBatch('');
     setCoaResult(null);
     setCoaRefused(false);
     setCoaConfigured(true);
@@ -2404,14 +2415,16 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // agent's get_coa tool, which emits the certificate as a {coa:{...}} side-channel —
   // never a link in the model's text. That opens the SAME panel the hub card does,
   // already holding the released certificate. Mirrors openSdsPickerWithResult, except
-  // the field is left EMPTY rather than prefilled — openSdsPickerWithResult can
-  // prefill a clean product name, while the COA tool's slot holds whatever the model
-  // passed it, which reads as the tail of a question in a text box.
+  // BOTH fields are left EMPTY rather than prefilled — openSdsPickerWithResult can
+  // prefill a clean product name, while there is no reliable way to split what the
+  // model captured into a product code and a batch number (coa-split-lookup-fields
+  // §5.2), so a half-filled wrong field is worse than an empty form.
   const openCoaPickerWithResult = (row: CoaRow) => {
     setActiveHubCard(null);
     closePanels();
     setHubView('chat');
-    setCoaQuery('');
+    setCoaProduct('');
+    setCoaBatch('');
     setCoaResult(row);
     setCoaRefused(false);
     setCoaConfigured(true);
@@ -2558,8 +2571,12 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
   // requests left to debounce, and a keystroke that could burn a miss would punish a
   // customer for correcting their own typo.
   const submitCoaLookup = () => {
-    const term = coaQuery.trim();
-    if (!term || coaSearching || coaLockedOut || !coaConfigured || !activeApiKey) return;
+    const product = coaProduct.trim();
+    const batch = coaBatch.trim();
+    // Either field alone is a legitimate query — a dotted batch tokenizes into two
+    // parts on its own (coa-split-lookup-fields §5.2) — so the form must not be
+    // stricter than the lookup behind it; the backend decides whether it resolves.
+    if ((!product && !batch) || coaSearching || coaLockedOut || !coaConfigured || !activeApiKey) return;
     const id = ++coaRequestId.current;
     setCoaSearching(true);
     setCoaError(null);
@@ -2569,7 +2586,8 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     // visitor_id is what the throttle binds to (§5): sessionId rotates on "New
     // conversation", so a cooldown bound to it would survive exactly one click.
     const visitor = visitorIdRef.current ? `&visitor_id=${encodeURIComponent(visitorIdRef.current)}` : '';
-    fetch(`${activeApiUrl}/api/widget/coa?q=${encodeURIComponent(term)}${visitor}`, {
+    const params = `product=${encodeURIComponent(product)}&batch=${encodeURIComponent(batch)}${visitor}`;
+    fetch(`${activeApiUrl}/api/widget/coa?${params}`, {
       headers: {
         'x-api-key': activeApiKey,
         ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
@@ -3128,10 +3146,30 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
     });
   };
 
+  // Phase 5 (coa-split-lookup-fields-plan §7) — shape-only analytics beacon: did a
+  // visitor who reached the panel click through to a human. Fire-and-forget, same
+  // discipline as the loader's own teaser-event beacon — a failure here must never
+  // block or surface to the visitor, so the promise is intentionally not awaited.
+  const logCoaContactSupport = () => {
+    if (!activeApiKey) return;
+    const parentOrigin = (typeof window !== 'undefined' && (window as unknown as { __SapybaseParentOrigin?: string }).__SapybaseParentOrigin) || '';
+    fetch(`${activeApiUrl}/api/widget/coa-event`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': activeApiKey,
+        ...(parentOrigin ? { 'x-Sapybase-parent-origin': parentOrigin } : {}),
+      },
+      body: JSON.stringify({ source: coaFromChat ? 'chat' : 'panel' }),
+    }).catch(() => { /* noop — analytics must never block the handoff */ });
+  };
+
   // The COA panel's way out (L2). The form renders as a chat message, so the panel
   // has to step aside for the visitor to see it — which is now always, since the
   // redirect path shows the form too.
   const contactSupportFromCoa = () => {
+    logCoaContactSupport();
     setCoaPickerOpen(false);
     handleHandoff();
   };
@@ -3688,11 +3726,13 @@ export default function ChatWidget({ apiKey, isEmbed = false }: ChatWidgetProps)
                 lockedOut={coaLockedOut}
                 configured={coaConfigured}
                 error={coaError}
-                query={coaQuery}
+                product={coaProduct}
+                batch={coaBatch}
                 themeColor={THEME_COLOR}
                 fromChat={coaFromChat}
                 supportSent={handoffSent}
-                onQueryChange={setCoaQuery}
+                onProductChange={setCoaProduct}
+                onBatchChange={setCoaBatch}
                 onSubmit={submitCoaLookup}
                 onCancel={() => setCoaPickerOpen(false)}
                 onContactSupport={contactSupportFromCoa}

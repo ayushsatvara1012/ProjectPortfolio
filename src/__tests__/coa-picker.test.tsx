@@ -227,25 +227,28 @@ describe('CoaPicker — the panel a visitor sees', () => {
     lockedOut: false,
     configured: true,
     error: null as string | null,
-    query: '',
+    product: '',
+    batch: '',
     themeColor: '#2563eb',
     fromChat: false,
     supportSent: false,
-    onQueryChange: vi.fn(),
+    onProductChange: vi.fn(),
+    onBatchChange: vi.fn(),
     onSubmit: vi.fn(),
     onCancel: vi.fn(),
     onContactSupport: vi.fn(),
   };
-  const field = () => screen.getByLabelText('Product code and batch number');
-  const request = () => screen.getByRole('button', { name: 'Request' });
+  const productField = () => screen.getByLabelText('Product code');
+  const batchField = () => screen.getByLabelText('Batch number');
+  const request = () => screen.getByRole('button', { name: 'Request certificate' });
 
   it('looks nothing up until Request is pressed (C7)', () => {
     const onSubmit = vi.fn();
-    const onQueryChange = vi.fn();
-    render(<CoaPicker {...props} query="100RG" onSubmit={onSubmit} onQueryChange={onQueryChange} />);
+    const onProductChange = vi.fn();
+    render(<CoaPicker {...props} product="100RG" onSubmit={onSubmit} onProductChange={onProductChange} />);
 
-    fireEvent.change(field(), { target: { value: '100RG 100.26R01' } });
-    expect(onQueryChange).toHaveBeenCalled();
+    fireEvent.change(productField(), { target: { value: '100RG025L' } });
+    expect(onProductChange).toHaveBeenCalled();
     expect(onSubmit).not.toHaveBeenCalled();
 
     fireEvent.click(request());
@@ -254,39 +257,54 @@ describe('CoaPicker — the panel a visitor sees', () => {
 
   it('submits on Enter, exactly once', () => {
     const onSubmit = vi.fn();
-    const { container } = render(<CoaPicker {...props} query="100RG 100.26R016" onSubmit={onSubmit} />);
+    const { container } = render(<CoaPicker {...props} product="100RG" batch="100.26R016" onSubmit={onSubmit} />);
     fireEvent.submit(container.querySelector('form')!);
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it('has nothing to request until something is typed', () => {
-    render(<CoaPicker {...props} query="   " />);
+  it('has nothing to request until both fields are empty', () => {
+    render(<CoaPicker {...props} product="   " batch="   " />);
     expect(request()).toBeDisabled();
   });
 
-  it('renders one refusal and never a list, and leaves the field usable (C3)', () => {
-    render(<CoaPicker {...props} query="acetone" refused />);
+  it('is enabled once EITHER field has content, not just both', () => {
+    // coa-split-lookup-fields §5.2 — the form must never be stricter than the
+    // lookup behind it. A dotted batch alone already resolves some certificates
+    // on its own, so it must not be blocked from submitting.
+    const { rerender } = render(<CoaPicker {...props} product="" batch="" />);
+    expect(request()).toBeDisabled();
+    rerender(<CoaPicker {...props} product="100RG" batch="" />);
+    expect(request()).toBeEnabled();
+    rerender(<CoaPicker {...props} product="" batch="100.26R016" />);
+    expect(request()).toBeEnabled();
+  });
+
+  it('renders one refusal and never a list, and leaves both fields usable (C3)', () => {
+    render(<CoaPicker {...props} product="acetone" refused />);
     expect(screen.getByText(COA_REFUSED_MESSAGE)).toBeInTheDocument();
     // The refusal must say nothing about the library: no count, no near-miss, no
     // row a visitor could read a product code or batch off.
     expect(screen.queryByText(/100\.26R016/)).not.toBeInTheDocument();
-    expect(field()).toBeEnabled();
+    expect(productField()).toBeEnabled();
+    expect(batchField()).toBeEnabled();
     expect(request()).toBeEnabled();
   });
 
   it('releases the certificate with Open and Download', () => {
-    render(<CoaPicker {...props} query="100RG 100.26R016" result={ROW('a')} />);
+    render(<CoaPicker {...props} product="100RG" batch="100.26R016" result={ROW('a')} />);
     expect(screen.getByText(ROW('a').display)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Open/ })).toHaveAttribute('href', ROW('a').view_url);
     expect(screen.getByRole('button', { name: /Download/ })).toBeInTheDocument();
-    // The field stays available for the next lookup.
-    expect(field()).toBeEnabled();
+    // Both fields stay available for the next lookup.
+    expect(productField()).toBeEnabled();
+    expect(batchField()).toBeEnabled();
   });
 
-  it('disables the field on a lockout and offers no countdown (§5.1)', () => {
-    render(<CoaPicker {...props} query="100RG 100.26R999" lockedOut />);
+  it('disables both fields on a lockout and offers no countdown (§5.1)', () => {
+    render(<CoaPicker {...props} product="100RG" batch="100.26R999" lockedOut />);
     expect(screen.getByText(COA_LOCKED_MESSAGE)).toBeInTheDocument();
-    expect(field()).toBeDisabled();
+    expect(productField()).toBeDisabled();
+    expect(batchField()).toBeDisabled();
     expect(request()).toBeDisabled();
     // A live "try again in 14:32" hands over the exact window and invites the
     // visitor to wait it out. The route offered is support, not patience.
@@ -295,27 +313,29 @@ describe('CoaPicker — the panel a visitor sees', () => {
   });
 
   it('re-enables itself once the lockout clears, without announcing it', () => {
-    const { rerender } = render(<CoaPicker {...props} query="100RG" lockedOut />);
-    expect(field()).toBeDisabled();
-    rerender(<CoaPicker {...props} query="100RG" lockedOut={false} />);
-    expect(field()).toBeEnabled();
+    const { rerender } = render(<CoaPicker {...props} product="100RG" lockedOut />);
+    expect(productField()).toBeDisabled();
+    rerender(<CoaPicker {...props} product="100RG" lockedOut={false} />);
+    expect(productField()).toBeEnabled();
     expect(screen.queryByText(COA_LOCKED_MESSAGE)).not.toBeInTheDocument();
   });
 
   it('shows the outage copy for a Drive failure, never the refusal (§6)', () => {
     const onSubmit = vi.fn();
-    render(<CoaPicker {...props} query="100RG 100.26R016" error={COA_OUTAGE_MESSAGE} onSubmit={onSubmit} />);
+    render(<CoaPicker {...props} product="100RG" batch="100.26R016" error={COA_OUTAGE_MESSAGE} onSubmit={onSubmit} />);
     expect(screen.getByText(COA_OUTAGE_MESSAGE)).toBeInTheDocument();
     expect(screen.queryByText(COA_REFUSED_MESSAGE)).not.toBeInTheDocument();
-    // An outage is our failure, not the visitor's: it never costs them the field.
-    expect(field()).toBeEnabled();
+    // An outage is our failure, not the visitor's: it never costs them the fields.
+    expect(productField()).toBeEnabled();
+    expect(batchField()).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('sends nobody to a lookup that was never set up', () => {
-    render(<CoaPicker {...props} configured={false} query="100RG 100.26R016" />);
-    expect(field()).toBeDisabled();
+    render(<CoaPicker {...props} configured={false} product="100RG" batch="100.26R016" />);
+    expect(productField()).toBeDisabled();
+    expect(batchField()).toBeDisabled();
     expect(request()).toBeDisabled();
   });
 });
@@ -328,11 +348,13 @@ describe('L2 — every dead end has a way out', () => {
     lockedOut: false,
     configured: true,
     error: null as string | null,
-    query: '',
+    product: '',
+    batch: '',
     themeColor: '#2563eb',
     fromChat: false,
     supportSent: false,
-    onQueryChange: vi.fn(),
+    onProductChange: vi.fn(),
+    onBatchChange: vi.fn(),
     onSubmit: vi.fn(),
     onCancel: vi.fn(),
     onContactSupport: vi.fn(),
@@ -354,9 +376,10 @@ describe('L2 — every dead end has a way out', () => {
   });
 
   it('is the only way forward from a lockout, where nothing else is pressable', () => {
-    render(<CoaPicker {...props} lockedOut query="100RG 100.26R999" />);
-    expect(screen.getByLabelText('Product code and batch number')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Request' })).toBeDisabled();
+    render(<CoaPicker {...props} lockedOut product="100RG" batch="100.26R999" />);
+    expect(screen.getByLabelText('Product code')).toBeDisabled();
+    expect(screen.getByLabelText('Batch number')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Request certificate' })).toBeDisabled();
     expect(support()).toBeEnabled();
   });
 
@@ -388,12 +411,11 @@ describe('L2 — every dead end has a way out', () => {
 
   it('never turns the refusal into a hint about the library', () => {
     // The button is the only thing added to this state, and C3 still owns the words.
-    render(<CoaPicker {...props} refused query="acetone" />);
+    render(<CoaPicker {...props} refused product="acetone" />);
     expect(screen.getByText(COA_REFUSED_MESSAGE)).toBeInTheDocument();
     expect(screen.queryByText(/certificate.*exist|match|found|\d+ result/i)).not.toBeInTheDocument();
   });
 });
-
 describe('H8 — the Download target', () => {
   // Both fields are strings, so TypeScript cannot tell them apart and swapping them
   // would look completely healthy: the customer just gets an HTML page saved under a

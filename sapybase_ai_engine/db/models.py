@@ -237,6 +237,19 @@ class TeaserEventRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class CoaEventRequest(BaseModel):
+    """Widget analytics beacon for the COA panel's Contact-support button
+    (coa-split-lookup-fields-plan Phase 5). The lookup shape itself — which
+    fields were filled, which pass released a certificate or that nothing did —
+    is logged server-side where it is already resolved; this is the one COA
+    event only the browser can see. ``source`` records whether the panel was
+    open from the hub card ('panel') or from a chat-resolved/locked result
+    ('chat'), validated server-side in main.py alongside the outcome enum."""
+    source: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class TeaserSuggestRequest(BaseModel):
     """Dashboard "Suggest copy" assist for the teaser rule editor (Phase 3).
 

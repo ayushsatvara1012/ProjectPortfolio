@@ -75,7 +75,8 @@ class TestAvailabilityGating:
         assert names == set(load_pack("chemical").tool_names())
 
     def test_an_unavailable_tool_called_anyway_gets_the_benign_error(self):
-        obs = executor(_ctx(coa_configured=False), {})("get_coa", {"query": "x"})
+        obs = executor(_ctx(coa_configured=False), {})(
+            "get_coa", {"product_code": "x", "batch_number": ""})
         assert obs["status"] == "error" and "not available" in obs["message"]
 
     def test_an_unknown_tool_gets_the_benign_error(self):
@@ -166,7 +167,7 @@ class TestAsyncToolAndPrivateKeys:
 
         captured = {}
         run = executor(_ctx(coa_configured=True, runners={"get_coa": runner}), captured)
-        obs = asyncio.run(run("get_coa", {"query": "acetone"}))
+        obs = asyncio.run(run("get_coa", {"product_code": "acetone", "batch_number": ""}))
         assert captured["coa"] == {
             "status": "found", "results": [{"name": "COA.pdf"}], "query": "acetone",
         }
@@ -179,13 +180,14 @@ class TestAsyncToolAndPrivateKeys:
 
         captured = {}
         run = executor(_ctx(coa_configured=True, runners={"get_coa": runner}), captured)
-        obs = asyncio.run(run("get_coa", {"query": "x"}))
+        obs = asyncio.run(run("get_coa", {"product_code": "x", "batch_number": ""}))
         assert captured["coa"]["status"] == "locked_out"
         assert captured["coa"]["retry_after"] == 900
         assert "_lockout" not in obs
 
     def test_coa_without_an_injected_runner_degrades_benignly(self):
-        obs = executor(_ctx(coa_configured=True), {})("get_coa", {"query": "x"})
+        obs = executor(_ctx(coa_configured=True), {})(
+            "get_coa", {"product_code": "x", "batch_number": ""})
         assert obs["status"] == "error"
 
 
