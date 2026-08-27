@@ -14,7 +14,9 @@
  *   - R7: picking a sheet PINS it above a search box that stays live, so comparing
  *     USP against BP never means going back to Home.
  *   - R3: a capped list says how many matched, or it reads as the whole answer.
- *   - H8/§15: Download targets download_url and the extension follows the source file.
+ *   - H8: Open spec targets view_url, never a blob download - Drive's uc?export=download
+ *     endpoint sends no CORS headers, so a client-side Download always degraded to
+ *     opening Drive's own page anyway.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -306,17 +308,14 @@ describe('SpecPicker — the rendered panel', () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
-  it('downloads the direct-download URL under the source file\'s extension', () => {
-    // H8 — a webViewLink is an HTML viewer page, so saving that blob as .pdf hands
-    // the customer a corrupt file. §15 — and a .docx spec must not become a .pdf.
-    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('no cors'));
+  it('offers only Open spec, no separate Download button', () => {
+    // Drive's uc?export=download endpoint sends no CORS headers, so a client-side
+    // Download always degraded to opening Drive's own page anyway - Open spec
+    // takes the visitor straight to view_url instead of via a second button.
     const docx = ROW('id-docx', 'Toluene · Spec', { ext: 'docx' });
     render(<SpecPicker {...PANEL({ pinned: docx })} />);
-    fireEvent.click(screen.getByRole('button', { name: /download/i }));
-    expect(fetchMock).toHaveBeenCalledWith(docx.download_url);
-    fetchMock.mockRestore();
-    open.mockRestore();
+    expect(screen.getByRole('link', { name: /open spec/i })).toHaveAttribute('href', docx.view_url);
+    expect(screen.queryByRole('button', { name: /download/i })).not.toBeInTheDocument();
   });
 
   it('omits the date rather than rendering an empty one', () => {

@@ -290,11 +290,11 @@ describe('CoaPicker — the panel a visitor sees', () => {
     expect(request()).toBeEnabled();
   });
 
-  it('releases the certificate with Open and Download', () => {
+  it('releases the certificate with an Open link, no separate Download button', () => {
     render(<CoaPicker {...props} product="100RG" batch="100.26R016" result={ROW('a')} />);
     expect(screen.getByText(ROW('a').display)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Open/ })).toHaveAttribute('href', ROW('a').view_url);
-    expect(screen.getByRole('button', { name: /Download/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Download/ })).not.toBeInTheDocument();
     // Both fields stay available for the next lookup.
     expect(productField()).toBeEnabled();
     expect(batchField()).toBeEnabled();
@@ -416,22 +416,18 @@ describe('L2 — every dead end has a way out', () => {
     expect(screen.queryByText(/certificate.*exist|match|found|\d+ result/i)).not.toBeInTheDocument();
   });
 });
-describe('H8 — the Download target', () => {
-  // Both fields are strings, so TypeScript cannot tell them apart and swapping them
-  // would look completely healthy: the customer just gets an HTML page saved under a
-  // .pdf name. Asserted against the source the same way the backend asserts its
-  // one-resolver invariant with inspect.getsource.
+describe('H8 — Open targets the viewer page, and only the viewer page', () => {
+  // A COA no longer offers a client-side Download button (Drive's uc?export=download
+  // endpoint sends no CORS headers, so it never auto-downloaded anyway - it just
+  // opened Drive's own interstitial). Open is the one control, and it must never
+  // point at download_url, which used to hand a customer an HTML page saved as .pdf.
   const source = readFileSync(
     resolve(__dirname, '../components/chat/ChatWidget.tsx'), 'utf8');
-  const panel = source.slice(source.indexOf('function CoaPicker'), source.indexOf('async function downloadDocument'));
+  const panel = source.slice(source.indexOf('function CoaPicker'), source.indexOf('export function SpecPicker'));
 
-  it('the panel downloads download_url, never the viewer page', () => {
-    expect(panel).toContain('downloadDocument(released.download_url!');
-    expect(panel).not.toContain('downloadDocument(released.view_url');
-  });
-
-  it('the panel still opens the viewer page for Open', () => {
+  it('the panel opens view_url, never download_url', () => {
     expect(panel).toContain('href={released.view_url}');
+    expect(panel).not.toContain('downloadDocument(released.download_url');
   });
 });
 

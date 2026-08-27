@@ -1240,16 +1240,14 @@ function SdsPicker({ products, loading, searching, error, query, selected, theme
                 </div>
               )}
               <div className="mt-2 flex items-center gap-2">
+                {/* Drive's uc?export=download endpoint sends no CORS headers, so a
+                    client-side "Download" always degraded to opening Drive's own
+                    page anyway - Open just takes the visitor straight there. */}
                 <a href={selected.url} target="_blank" rel="noopener noreferrer"
                   className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
                   style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
                   <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
                 </a>
-                <button type="button" onClick={() => downloadDocument(selected.url, `${selected.product || 'safety-data-sheet'}.pdf`)}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                  style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
-                  <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
-                </button>
               </div>
             </div>
           </div>
@@ -1457,21 +1455,15 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
               )}
               <div className="mt-2 flex items-center gap-2">
                 {released.view_url && (
+                  // Drive's uc?export=download endpoint sends no CORS headers, so a
+                  // client-side "Download" always degraded to opening Drive's own
+                  // page anyway (interstitial or sign-in prompt) - Open just takes
+                  // the visitor straight there instead of via a second button.
                   <a href={released.view_url} target="_blank" rel="noopener noreferrer"
                     className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
                     style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
                     <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open
                   </a>
-                )}
-                {released.download_url && (
-                  // H8 — download_url, never view_url: a Drive webViewLink is an
-                  // HTML viewer page, so saving that blob as .pdf hands the
-                  // customer a corrupt file.
-                  <button type="button" onClick={() => downloadDocument(released.download_url!, `${released.display || 'certificate-of-analysis'}.pdf`)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                    style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
-                    <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
-                  </button>
                 )}
               </div>
             </div>
@@ -1569,16 +1561,6 @@ export function SpecPicker({ rows, pinned, searching, configured, error, query, 
                     <MIcon name="open_in_new" className="text-[14px] leading-none" /> Open spec
                   </a>
                 )}
-                {pinned.download_url && (
-                  // H8 — download_url, never view_url: a Drive webViewLink is an HTML
-                  // viewer page. §15 — the extension follows the source file, so a
-                  // .docx specification is not saved under a .pdf name.
-                  <button type="button" onClick={() => downloadDocument(pinned.download_url!, `${pinned.display || 'specification'}.${pinned.ext || 'pdf'}`)}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-google font-bold transition-colors text-[color:var(--btn-tc)] dark:!text-white hover:bg-slate-50 dark:hover:bg-slate-700/50"
-                    style={{ borderColor: themeColor, '--btn-tc': themeColor } as React.CSSProperties}>
-                    <MIcon name="arrow_downward" className="text-[14px] leading-none" /> Download
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -1668,49 +1650,6 @@ function SpecChatButton({ onClick }: { onClick: () => void }) {
       Ask in the chat
     </button>
   );
-}
-
-// Best-effort real download for a document: an <a download> is silently ignored
-// by the browser for cross-origin URLs (no way around that from script), so
-// this fetches the file and saves it via a blob URL when the host's CORS
-// headers allow it, falling back to opening the file's own URL when the host
-// doesn't cooperate (Google Drive's uc?export=download endpoint sends no CORS
-// headers, so a COA/SDS/spec download always takes this path).
-//
-// The fallback tab is opened HERE, synchronously, in direct response to the
-// click - not from inside the catch block below. window.open() called after
-// an `await` has lost the click's user-activation, and browsers (Safari
-// especially) then silently open a blank tab instead of navigating it, rather
-// than blocking the popup outright - which is exactly the "opens a blank page"
-// bug this replaces. Navigating an ALREADY-OPEN tab via script is allowed
-// regardless of activation state, so the fix is to open the tab first and
-// decide afterward whether to close it (blob path worked) or point it at the
-// real URL (it didn't).
-async function downloadDocument(url: string, filename: string) {
-  const fallbackTab = window.open('', '_blank');
-  if (fallbackTab) fallbackTab.opener = null; // same effect as noopener, without losing the handle
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = objectUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(objectUrl);
-    fallbackTab?.close(); // downloaded directly in this tab; the blank one was never needed
-  } catch {
-    if (fallbackTab) {
-      fallbackTab.location.href = url;
-    } else {
-      // The synchronous open above was itself blocked (rare) - nothing left to
-      // do without a fresh user gesture.
-      window.open(url, '_blank', 'noopener,noreferrer');
-    }
-  }
 }
 
 // ── ChatWidget ────────────────────────────────────────────────────────────────
