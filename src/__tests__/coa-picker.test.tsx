@@ -238,7 +238,7 @@ describe('CoaPicker — the panel a visitor sees', () => {
     onCancel: vi.fn(),
     onContactSupport: vi.fn(),
   };
-  const productField = () => screen.getByLabelText('Product code');
+  const productField = () => screen.getByLabelText('Product/Pack Code');
   const batchField = () => screen.getByLabelText('Batch number');
   const request = () => screen.getByRole('button', { name: 'Request certificate' });
 
@@ -377,7 +377,7 @@ describe('L2 — every dead end has a way out', () => {
 
   it('is the only way forward from a lockout, where nothing else is pressable', () => {
     render(<CoaPicker {...props} lockedOut product="100RG" batch="100.26R999" />);
-    expect(screen.getByLabelText('Product code')).toBeDisabled();
+    expect(screen.getByLabelText('Product/Pack Code')).toBeDisabled();
     expect(screen.getByLabelText('Batch number')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Request certificate' })).toBeDisabled();
     expect(support()).toBeEnabled();

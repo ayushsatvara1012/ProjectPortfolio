@@ -1355,7 +1355,9 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
   // lookup behind it. A dotted batch alone already resolves some certificates on
   // its own (it tokenizes to two parts), so either field having content is enough
   // to submit; the backend, not this button, decides whether it resolves.
-  const fieldClass = "flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:cursor-not-allowed disabled:opacity-60";
+  // uppercase: every product/batch code is upper case on the label, so typed
+  // lowercase would only ever look like a mismatch against it.
+  const fieldClass = "flex-1 min-w-0 bg-transparent focus:outline-none text-[14px] font-google text-slate-900 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 disabled:cursor-not-allowed disabled:opacity-60 uppercase";
   const fieldWrapClass = "flex items-center gap-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 px-3 py-2 transition-colors focus-within:border-blue-500 focus-within:ring-[0.3px] focus-within:ring-blue-500";
   return (
     <div className="flex-1 min-h-0 flex flex-col bg-gray-50/50 dark:bg-slate-950/50">
@@ -1375,18 +1377,18 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
         className="px-3.5 pt-3 pb-1 shrink-0">
         <div className="flex flex-col gap-2">
           <label className="flex flex-col gap-1">
-            <span className="px-1 text-[11px] font-google font-semibold text-slate-500 dark:text-slate-400">Product code</span>
+            <span className="px-1 text-[11px] font-google font-semibold text-slate-500 dark:text-slate-400">Product/Pack Code</span>
             <div className={fieldWrapClass}>
-              <input value={product} onChange={e => onProductChange(e.target.value)} autoFocus
+              <input value={product} onChange={e => onProductChange(e.target.value.toUpperCase())} autoFocus
                 disabled={inputDisabled}
-                placeholder="e.g. 100RG" aria-label="Product code"
+                placeholder="e.g. 100RG" aria-label="Product/Pack Code"
                 className={fieldClass} />
             </div>
           </label>
           <label className="flex flex-col gap-1">
             <span className="px-1 text-[11px] font-google font-semibold text-slate-500 dark:text-slate-400">Batch number</span>
             <div className={fieldWrapClass}>
-              <input value={batch} onChange={e => onBatchChange(e.target.value)}
+              <input value={batch} onChange={e => onBatchChange(e.target.value.toUpperCase())}
                 disabled={inputDisabled}
                 placeholder="e.g. 100.26R016" aria-label="Batch number"
                 className={fieldClass} />
@@ -1395,7 +1397,7 @@ export function CoaPicker({ result, refused, searching, lockedOut, configured, e
           </label>
         </div>
         <button type="submit" disabled={inputDisabled || searching || (!product.trim() && !batch.trim())}
-          className="mt-2 w-full px-4 py-2 rounded-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
+          className="mt-2 w-44 mx-auto px-4 py-2 rounded-full text-[13px] font-google font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center"
           style={{ backgroundColor: themeColor }}>
           Request certificate
         </button>
@@ -1671,11 +1673,22 @@ function SpecChatButton({ onClick }: { onClick: () => void }) {
 // Best-effort real download for a document: an <a download> is silently ignored
 // by the browser for cross-origin URLs (no way around that from script), so
 // this fetches the file and saves it via a blob URL when the host's CORS
-// headers allow it, falling back to the old "open in a new tab" behavior —
-// never worse than before, just better when the host cooperates. Google Drive
-// does not send CORS headers, so a COA takes the open-in-a-tab path, which is
-// exactly what the uc?export=download URL is for.
+// headers allow it, falling back to opening the file's own URL when the host
+// doesn't cooperate (Google Drive's uc?export=download endpoint sends no CORS
+// headers, so a COA/SDS/spec download always takes this path).
+//
+// The fallback tab is opened HERE, synchronously, in direct response to the
+// click - not from inside the catch block below. window.open() called after
+// an `await` has lost the click's user-activation, and browsers (Safari
+// especially) then silently open a blank tab instead of navigating it, rather
+// than blocking the popup outright - which is exactly the "opens a blank page"
+// bug this replaces. Navigating an ALREADY-OPEN tab via script is allowed
+// regardless of activation state, so the fix is to open the tab first and
+// decide afterward whether to close it (blob path worked) or point it at the
+// real URL (it didn't).
 async function downloadDocument(url: string, filename: string) {
+  const fallbackTab = window.open('', '_blank');
+  if (fallbackTab) fallbackTab.opener = null; // same effect as noopener, without losing the handle
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Download failed: ${res.status}`);
@@ -1688,8 +1701,15 @@ async function downloadDocument(url: string, filename: string) {
     a.click();
     a.remove();
     URL.revokeObjectURL(objectUrl);
+    fallbackTab?.close(); // downloaded directly in this tab; the blank one was never needed
   } catch {
-    window.open(url, '_blank', 'noopener,noreferrer');
+    if (fallbackTab) {
+      fallbackTab.location.href = url;
+    } else {
+      // The synchronous open above was itself blocked (rare) - nothing left to
+      // do without a fresh user gesture.
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   }
 }
 
