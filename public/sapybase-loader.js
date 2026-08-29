@@ -389,7 +389,7 @@
     // ── Contextual teaser (Phase 1) ──────────────────────────────────────────
     // The bubble lives HERE (host-page shadow DOM), not in ChatWidget: the
     // iframe is display:none while closed and cannot see the host URL. See
-    // docs/contextual-teaser-plan.md.
+    // docs/archived/contextual-teaser-plan.md.
 
     // Storage: sessionStorage only — a NEW browser session (new tab, or the
     // same tab after the browser was fully closed and reopened) always

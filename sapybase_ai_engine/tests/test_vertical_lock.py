@@ -1,4 +1,4 @@
-"""Vertical-lock plan (docs/vertical-lock-plan.md) — `companies.vertical` is a
+"""Vertical-lock plan (docs/archived/vertical-lock-plan.md) — `companies.vertical` is a
 structural field (drives pack/tool/RAG selection), so `PATCH /api/company`
 gates it to SUPER_ADMIN + an allowlist, separate from the tier-based gates on
 every other field in this endpoint.

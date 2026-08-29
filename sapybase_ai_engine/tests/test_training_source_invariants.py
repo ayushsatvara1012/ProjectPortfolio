@@ -1,7 +1,7 @@
 """One training job = one logical source.
 
 Two pre-existing bugs found while planning the URL scraper rewrite
-(docs/url-scraper-rewrite-plan.md, premise corrections 3 and 4):
+(docs/archived/url-scraper-rewrite-plan.md, premise corrections 3 and 4):
 
 - `url`/`file`/`csv_file`/`text` were not mutually exclusive, so a combined
   submission stored one input's content under another's name and splitting mode.

@@ -251,7 +251,7 @@ export const BotSettingsProvider = ({ children }: { children: React.ReactNode })
         handoff_redirect_url: botSettings.handoffRedirectUrl || null,
         hide_branding: botSettings.hideBranding,
         // vertical intentionally excluded — locked to SUPER_ADMIN edits via the
-        // admin panel (docs/vertical-lock-plan.md); this page renders it read-only.
+        // admin panel (docs/archived/vertical-lock-plan.md); this page renders it read-only.
         hot_lead_alerts_enabled: botSettings.hotLeadAlertsEnabled,
         alert_email: botSettings.alertEmail.trim() || null,
         weekly_digest_enabled: botSettings.weeklyDigestEnabled,

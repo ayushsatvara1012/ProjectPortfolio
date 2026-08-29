@@ -46,7 +46,7 @@ from core.embedding_config import EMBEDDING_DIMENSIONS
 # §8.2). Recorded in the control-plane schema_version registry (§8.1) so the
 # engine can version-gate reads of new columns during a rollout (Phase 6).
 # 0002: added company_knowledge.word_count (word-based storage limit plan,
-# docs/word-based-storage-limit-plan.md) — new provisions only; existing
+# docs/archived/word-based-storage-limit-plan.md) — new provisions only; existing
 # tenant DBs are not retrofitted by this bump (no live-tenant migration
 # runner exists yet), same limitation the chunk_type rollout accepted.
 DATA_PLANE_SCHEMA_VERSION = "0002"

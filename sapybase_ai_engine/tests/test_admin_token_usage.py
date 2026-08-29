@@ -1,4 +1,4 @@
-"""Cross-tenant Gemini token-spend rollup (docs/admin-panel-sync-plan.md Phase D).
+"""Cross-tenant Gemini token-spend rollup (docs/archived/admin-panel-sync-plan.md Phase D).
 
 GET /api/admin/token-usage shapes the same chat_logs aggregate the per-company
 GET /api/sessions/bi/{company_id} endpoint already uses (services.session_bi.

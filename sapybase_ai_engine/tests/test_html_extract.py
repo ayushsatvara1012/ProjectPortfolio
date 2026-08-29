@@ -1,6 +1,6 @@
 """Unit + regression tests for the in-house URL extractor (Phase 1).
 
-See docs/url-scraper-rewrite-plan.md R7.
+See docs/archived/url-scraper-rewrite-plan.md R7.
 """
 
 import pytest

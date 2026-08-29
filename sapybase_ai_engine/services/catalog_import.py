@@ -7,7 +7,7 @@ into those tables instead of being embedded as RAG knowledge.
 
 Real client spreadsheets are dirty, so this module is built to be *forgiving on
 input, strict on safety, and loud about what it did* (see
-docs/catalog-auto-import-plan.md). The five stages:
+docs/archived/catalog-auto-import-plan.md). The five stages:
 
   1. Header cleanup    — detect the real header row (skip title/logo rows).
   2. Synonym + match   — map normalized headers to canonical DB columns via the

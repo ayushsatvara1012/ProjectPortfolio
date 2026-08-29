@@ -1,4 +1,4 @@
-"""Fleet-wide admin agent-requests view (docs/admin-panel-sync-plan.md Phase C).
+"""Fleet-wide admin agent-requests view (docs/archived/admin-panel-sync-plan.md Phase C).
 
 GET /api/admin/agent-requests is the SUPER_ADMIN counterpart to the per-company
 GET /api/companies/{company_id}/agent-requests: same row shape, no company_id

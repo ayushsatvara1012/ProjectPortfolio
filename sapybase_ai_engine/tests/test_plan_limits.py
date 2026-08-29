@@ -78,7 +78,7 @@ class TestPlanLimits:
         # Values track config.py PLAN_LIMITS["EXPLORE"] (source of truth): the
         # 2026-06-12 pricing update raised these to 1000 messages / 200 chunks
         # (12,000 words after the word-based storage limit plan's x60 parity
-        # conversion, docs/word-based-storage-limit-plan.md).
+        # conversion, docs/archived/word-based-storage-limit-plan.md).
         assert e["messages"] == 1000
         assert e["words"] == 12000
         assert e["speed"] == "lite"

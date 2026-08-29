@@ -22,7 +22,7 @@ from datetime import timedelta
 # words, `lite` model, 50 owner-emails/mo. white_label is False here and must never be
 # enabled via any self-serve path (super-admin override only, logged).
 #
-# `words` (knowledge-base storage limit, docs/word-based-storage-limit-plan.md):
+# `words` (knowledge-base storage limit, docs/archived/word-based-storage-limit-plan.md):
 # a real word count (len(text.split())) summed over ingested RAG chunks — NOT a
 # chunk-row count. Values below are the pre-existing chunk limits × 60 (the
 # frontend's long-standing chunks-to-words display constant), so commercial

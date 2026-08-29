@@ -1,6 +1,6 @@
 """Phase 3 Slice 2: discovery endpoint + crawl fan-out training job.
 
-See docs/url-scraper-rewrite-plan.md Phase 3.
+See docs/archived/url-scraper-rewrite-plan.md Phase 3.
 """
 import json
 
