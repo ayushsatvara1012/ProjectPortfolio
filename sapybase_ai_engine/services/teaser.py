@@ -7,7 +7,7 @@ and the strings it carries end up on third-party pages — so they are cleaned
 and length-capped on every read AND every write. The loader injects them via
 ``textContent`` only; the caps here are defense-in-depth, not the XSS gate.
 
-See docs/contextual-teaser-plan.md (Phase 1 — static teaser, Phase 2 — contextual
+See docs/archived/contextual-teaser-plan.md (Phase 1 — static teaser, Phase 2 — contextual
 URL rules, Phase 3 — owner rule editor + AI "Suggest copy" authoring assist).
 """
 import json
@@ -256,7 +256,7 @@ def build_suggest_prompt(bot_name, vertical=None, match=None, page=None):
     Pure and testable — the actual Gemini call lives in main.py so this module
     stays free of network I/O. AI only assists here: the owner reviews and
     edits the suggestion before it is ever saved, and it never runs on the
-    visitor's page (see docs/contextual-teaser-plan.md)."""
+    visitor's page (see docs/archived/contextual-teaser-plan.md)."""
     name = (bot_name or "").strip() or "Sapy AI"
     context_bits = []
     if page:

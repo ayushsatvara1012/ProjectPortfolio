@@ -67,4 +67,4 @@ Add three optional, config-only fields (all default to today's behavior):
 ## Out of scope
 
 - The POR/`is_por` cleaning bug (separate task).
-- Frontend changes (the catalog viewer from `docs/catalog-viewer-plan.md` already shows both tables).
+- Frontend changes (the catalog viewer from `docs/archived/catalog-viewer-plan.md` already shows both tables).

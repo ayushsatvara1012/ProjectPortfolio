@@ -162,10 +162,10 @@ This lets you launch custom plans while you build the full admin tooling.
 
 When ready to code, read in this order:
 
-1. **`docs/frontend_analysis_summary.md`** — Quick 1-page overview
-2. **`docs/frontend_implementation_analysis.md`** — Detailed gaps
-3. **`docs/frontend_component_map.md`** — Component structure
-4. **`docs/custom_plan_admin_ui_flow.md`** — Admin UX flow (for design reference)
+1. **`docs/archived/frontend_analysis_summary.md`** — Quick 1-page overview
+2. **`docs/archived/frontend_implementation_analysis.md`** — Detailed gaps
+3. **`docs/archived/frontend_component_map.md`** — Component structure
+4. **`docs/runbooks/custom_plan_admin_ui_flow.md`** — Admin UX flow (for design reference)
 
 ---
 

@@ -5,7 +5,7 @@ import type { FeatureGroup, MermaidType, NodeKind } from '@/src/content/architec
 // Structural invariants for the /architecture registry (the single source of
 // truth). These fail CI if an entry is internally broken — a dangling edge, a
 // duplicate/unsafe id, a diagram wired to a non-existent node — so registry
-// drift is caught before it ships. See docs/architecture-canvas-plan.md.
+// drift is caught before it ships. See docs/archived/architecture-canvas-plan.md.
 
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const GROUPS: FeatureGroup[] = ['ingestion', 'core', 'delivery', 'platform'];

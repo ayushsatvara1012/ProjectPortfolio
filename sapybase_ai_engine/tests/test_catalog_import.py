@@ -1,6 +1,6 @@
 """Edge-case coverage for the robust catalog auto-import pipeline.
 
-Mirrors docs/catalog-auto-import-plan.md: dirty headers, synonyms, currency
+Mirrors docs/archived/catalog-auto-import-plan.md: dirty headers, synonyms, currency
 cleaning, POR/null handling, NOT-NULL skips, near-miss warnings, the
 zero-valid-rows safety gate, two-sheets-one-table merge, and the apply write.
 """

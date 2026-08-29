@@ -14,7 +14,7 @@ answers precisely.
 
 Research found that most of this is already built:
 
-- `docs/intelligent-agent-memory-plan.md` — session memory, sales-funnel
+- `docs/archived/intelligent-agent-memory-plan.md` — session memory, sales-funnel
   state machine, next-best-action injection, owner-facing BI, privacy
   hardening — every phase through Phase 4 is checked done.
 - `docs/chemical-catalog-upload-guide.md` — the client-facing Excel/CSV
@@ -77,7 +77,7 @@ a tool for the same slot within a session.
 ## Verification
 
 - Phase 1: upload a deliberately dirty chemical sheet (mock data from
-  `docs/chemical-vertical-test-plan.md` with a renamed required column and
+  `docs/archived/chemical-vertical-test-plan.md` with a renamed required column and
   a NOT-NULL-violating row) via the dashboard; confirm the warning list
   renders with specific sheet/column/row detail.
 - Phase 2: thumbs-down a chat answer in the running widget; confirm

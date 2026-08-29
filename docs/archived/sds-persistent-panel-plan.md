@@ -4,7 +4,7 @@
 
 Make every SDS lookup - whether started from the "Request SDS" hub card or typed into chat ("SDS for acetone") - land in one self-contained panel that stays open across multiple searches, instead of closing after a single pick or posting a card into the chat transcript.
 
-Builds directly on `docs/get-sds-crash-fix-plan.md` (Option B, shipped `c5fa1718`/`90333df2`), which already gave the picker its search box, product list, and inline-preview card. This plan changes only what happens *after* a pick, and adds a second entry point (the conversational path) into the same panel.
+Builds directly on `docs/archived/get-sds-crash-fix-plan.md` (Option B, shipped `c5fa1718`/`90333df2`), which already gave the picker its search box, product list, and inline-preview card. This plan changes only what happens *after* a pick, and adds a second entry point (the conversational path) into the same panel.
 
 ## Problem (user-reported, 2026-07-23)
 
@@ -64,5 +64,5 @@ No functional change. `sapybase_ai_engine/main.py:3600-3615` already sends `{url
 ## Out of scope
 
 - Auto-opening the panel on `no_sheet_on_file` / `ambiguous` / `not_found` (D4) - the agent's existing conversational clarification is left as-is.
-- Option C (full SDS library page) - already out of scope per `docs/get-sds-crash-fix-plan.md`.
+- Option C (full SDS library page) - already out of scope per `docs/archived/get-sds-crash-fix-plan.md`.
 - Any change to `get_sds` resolution logic itself (grade-agnostic, newest-https-wins) - unchanged from the crash-fix plan.

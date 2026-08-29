@@ -201,7 +201,7 @@ def _decode_response_body(response) -> str:
 def _extract_page_text(body: str, source_url: str, seen_blocks: set[str] | None = None) -> str:
     """Own the extraction stage, degrading to the raw body on any parser error.
 
-    A malformed page must never 500 a training job (see docs/url-scraper-rewrite-plan.md R1/R4).
+    A malformed page must never 500 a training job (see docs/archived/url-scraper-rewrite-plan.md R1/R4).
     ``seen_blocks`` carries cross-page dedup state through a crawl; omit it for single pages.
     """
     try:
@@ -2956,7 +2956,7 @@ async def update_company_details(
                 continue
             if field == "vertical":
                 # Structural field — drives pack/tool/RAG selection, not cosmetic.
-                # Locked to SUPER_ADMIN per docs/vertical-lock-plan.md; reject
+                # Locked to SUPER_ADMIN per docs/archived/vertical-lock-plan.md; reject
                 # rather than silently drop so misuse attempts surface as errors.
                 if role != "SUPER_ADMIN":
                     raise HTTPException(
@@ -10735,7 +10735,7 @@ def get_admin_stats(request: Request, admin: dict = Depends(get_admin_user)):
 @app.get("/api/admin/token-usage")
 @limiter.limit("30/minute")
 def get_admin_token_usage(request: Request, window_days: int = 30, admin: dict = Depends(get_admin_user)):
-    """Cross-tenant Gemini token-spend rollup (docs/admin-panel-sync-plan.md Phase D) —
+    """Cross-tenant Gemini token-spend rollup (docs/archived/admin-panel-sync-plan.md Phase D) —
     the fleet-wide counterpart to the per-company token_metrics block in
     GET /api/sessions/bi/{company_id} (services/session_bi.build_token_metrics).
     Same source and scope as that endpoint: control-plane `chat_logs` only.
@@ -11314,7 +11314,7 @@ def update_company_vertical_admin(
     _fresh: dict = Depends(require_fresh_admin),  # Issue #16: Step-Up Auth
 ):
     """Super Admin: reassign a company's vertical pack (structural, not cosmetic —
-    see docs/vertical-lock-plan.md). Unlike PATCH /api/company, this isn't scoped
+    see docs/archived/vertical-lock-plan.md). Unlike PATCH /api/company, this isn't scoped
     to the caller's own companies since an admin edits any tenant's bot."""
     new_vertical = normalize_vertical(req.vertical)
     if new_vertical is not None and new_vertical not in known_verticals():

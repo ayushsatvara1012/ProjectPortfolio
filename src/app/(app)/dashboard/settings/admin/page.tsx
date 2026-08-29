@@ -293,7 +293,7 @@ const QuickActionModal = ({
 };
 
 // ── Vertical editor (per-bot, admin-only) ────────────────────────────────────
-// Locked to SUPER_ADMIN per docs/vertical-lock-plan.md — this is the only place
+// Locked to SUPER_ADMIN per docs/archived/vertical-lock-plan.md — this is the only place
 // a bot's vertical can be changed. Dropdown is sourced from the same registry
 // allowlist the backend validates against (GET /api/admin/verticals), so there
 // is no second hardcoded list of verticals to drift out of sync.

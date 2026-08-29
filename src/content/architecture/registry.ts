@@ -1,7 +1,7 @@
 import type { FeatureArchitecture } from './types';
 
 // Single source of truth for the /architecture pages. See
-// docs/architecture-canvas-plan.md ("Data sourcing and maintenance"): each entry
+// docs/archived/architecture-canvas-plan.md ("Data sourcing and maintenance"): each entry
 // is hand-authored from the real code it abstracts, scrubbed of secrets (no keys,
 // DSNs, endpoint paths, tenant IDs, or table DDL). The comment above each authored
 // entry names the source modules it abstracts, so touching that code flags that

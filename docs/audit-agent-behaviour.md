@@ -340,7 +340,7 @@ Over 60 negative constraints. "Do not restate your previous answer" appears four
 
 **A6 - Three rules, one sentence.** RULE 6 mandates exact fallback text (`main.py:3567`), RULE 2 bans denial openers (`main.py:3606`), RULE 5 carves out a third case (`main.py:3651`). `FALLBACK_PHRASES` (`main.py:3035`) then substring-matches the result to drive analytics.
 
-**A7 - Cache-hostile ordering.** The volatile KB block sits at `main.py:3681`, mid-prompt. Everything after it is stable content behind a cache-breaking boundary. `docs/streaming-cache-optimization-plan.md` already established implicit caching is the only available lever, and it keys on a stable prefix.
+**A7 - Cache-hostile ordering.** The volatile KB block sits at `main.py:3681`, mid-prompt. Everything after it is stable content behind a cache-breaking boundary. `docs/archived/streaming-cache-optimization-plan.md` already established implicit caching is the only available lever, and it keys on a stable prefix.
 
 **A8 - Stale comment.** `main.py:3716-3721` claims the user message is passed in system context, not as a HumanMessage. `main.py:3781` appends it as a HumanMessage.
 

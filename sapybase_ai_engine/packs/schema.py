@@ -3,7 +3,7 @@
 A "vertical pack" is *config, not a code fork*: one engine serves every industry,
 and a pack declares what makes a vertical different — its persona, the tools the
 agent may call, the slots each tool collects, the hub cards, and which knowledge
-kinds feed it. See docs/chemical-vertical-agent-plan.md §3.
+kinds feed it. See docs/archived/chemical-vertical-agent-plan.md §3.
 
 Phase 0 intentionally ships this as a versioned, code-reviewed *file* registry
 (packs/*.py), not a DB table. It is promoted to a table only when owners
