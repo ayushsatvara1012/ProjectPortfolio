@@ -43,9 +43,16 @@ describe('SampleFormEditor sink onboarding (Phase 3.4)', () => {
     expect(screen.getByText(/Delivered/)).toBeInTheDocument();
   });
 
-  it('reveals the Apps Script template on toggle', () => {
+  it('reveals the Apps Script on toggle', () => {
     render(<SampleFormEditor {...baseProps} />);
-    fireEvent.click(screen.getByText(/Apps Script template/));
+    fireEvent.click(screen.getByText(/Apps Script for these columns/));
     expect(screen.getByText(/function doPost/)).toBeInTheDocument();
+  });
+
+  it('generates the script from the fields currently on screen', () => {
+    const fields = [{ name: 'delivery_site', label: 'Delivery site', type: 'text', required: true }];
+    render(<SampleFormEditor {...baseProps} fields={fields} />);
+    fireEvent.click(screen.getByText(/Apps Script for these columns/));
+    expect(screen.getByText(/"delivery_site", "Delivery site"/)).toBeInTheDocument();
   });
 });

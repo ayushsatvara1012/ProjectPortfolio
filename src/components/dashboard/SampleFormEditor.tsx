@@ -6,21 +6,190 @@
 // field list + the data destination, persisted as companies.pack_overrides and
 // merged over the pack default at runtime. Only mounted for a vertical (pack) bot.
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { SampleFormField } from '@/src/lib/context/BotSettingsContext';
 
-// Copy-paste Google Apps Script that turns a bound Sheet into a working sink: it
-// appends one row per submission, flattening the `fields` object into columns.
-const APPS_SCRIPT_TEMPLATE = `function doPost(e) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var data = JSON.parse(e.postData.contents);
-  var fields = data.fields || {};
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['submitted_at'].concat(Object.keys(fields)));
+// The only columns that aren't the owner's own fields. These three are transport
+// metadata every sink payload carries whatever the vertical — a timestamp, the
+// dedupe key and the test-row marker — so they are not vertical logic. Anything a
+// PACK sends that the form doesn't declare (the chemical `cas_number` prefill, say)
+// is deliberately NOT listed: hardcoding it would put a dead column in the sheet of
+// every client whose bot never sends it. Those keys self-heal into a column the
+// first time one actually arrives.
+const LEADING_COLUMNS: [string, string][] = [['submitted_at', 'Submitted']];
+const TRAILING_COLUMNS: [string, string][] = [
+  ['idempotency_key', 'Request ID'],
+  ['test', 'Test'],
+];
+
+/** JS string literal for generated code — labels are owner text and may hold quotes. */
+const lit = (value: string): string => JSON.stringify(value);
+
+/**
+ * The [key, heading] column plan the generated script pins, in sheet order.
+ *
+ * Deduped by key (a form field named `cas_number` must not also get the meta one)
+ * and then by heading, because two fields may carry distinct keys under the same
+ * label and a heading is what the script matches a column on — colliding headings
+ * would silently write both values into one column.
+ */
+export function buildColumnPlan(fields: SampleFormField[]): [string, string][] {
+  const formColumns: [string, string][] = (Array.isArray(fields) ? fields : []).map((f) => {
+    const key = slugifyFieldName(f?.name || f?.label || '');
+    const label = (f?.label || '').trim();
+    return [key, label || key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())] as [string, string];
+  }).filter(([key]) => key);
+
+  const plan: [string, string][] = [];
+  const keys = new Set<string>();
+  const headings = new Set<string>();
+  for (const [key, heading] of [...LEADING_COLUMNS, ...formColumns, ...TRAILING_COLUMNS]) {
+    if (keys.has(key)) continue;
+    keys.add(key);
+    let unique = heading;
+    if (headings.has(unique)) unique = `${heading} (${key})`;
+    headings.add(unique);
+    plan.push([key, unique]);
   }
-  sheet.appendRow([data.submitted_at].concat(Object.values(fields)));
-  return ContentService.createTextOutput('ok');
+  return plan;
+}
+
+/**
+ * The copy-paste Apps Script, generated from THIS bot's sample form.
+ *
+ * Pinning the columns is what makes the sheet trustworthy: the sink's payload
+ * carries only the fields a visitor actually filled (empties are dropped server-side
+ * in sanitize_visitor_fields), so writing values positionally shifted every column
+ * left whenever an optional field was blank. Here each value is placed under its own
+ * heading, and a key the sheet has never seen appends a column on the right — so a
+ * field added in the dashboard later shows up without the owner re-pasting anything.
+ */
+export function buildAppsScript(fields: SampleFormField[]): string {
+  const plan = buildColumnPlan(fields);
+  const rows = plan.map(([key, heading]) => `  [${lit(key)}, ${lit(heading)}]`).join(',\n');
+  return `/**
+ * Sapybase sample requests -> this spreadsheet.
+ * Generated from your form. Paste over EVERYTHING in Code.gs, then:
+ *   Deploy -> New deployment -> Web app
+ *   Execute as: Me   |   Who has access: Anyone
+ * and put the /exec URL into Sapybase's "Data destination".
+ *
+ * Add a field in Sapybase later and a column appears here automatically -
+ * you only need to re-paste this if you want the new column's exact heading.
+ */
+var TAB_NAME = 'Sample requests';
+
+// Your form, in dashboard order: [payload key, column heading].
+var COLUMNS = [
+${rows}
+];
+
+function doPost(e) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);  // two submissions at once must not each add a header
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var fields = data.fields || {};
+    var row = {
+      submitted_at: data.submitted_at || new Date().toISOString(),
+      idempotency_key: data.idempotency_key || '',
+      test: data.test ? 'TEST' : ''
+    };
+    for (var key in fields) {
+      if (Object.prototype.hasOwnProperty.call(fields, key)) row[key] = fields[key];
+    }
+
+    var sheet = getSheet_();
+    if (!isDuplicate_(sheet, row.idempotency_key)) writeRow_(sheet, row);
+    return ok_();
+  } catch (err) {
+    return ContentService.createTextOutput('error: ' + err).setMimeType(ContentService.MimeType.TEXT);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** The destination tab, created on first use so a brand-new sheet just works. */
+function getSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  return ss.getSheetByName(TAB_NAME) || ss.insertSheet(TAB_NAME);
+}
+
+/** Row 1 as it stands. Empty on a fresh tab. */
+function readHeaders_(sheet) {
+  if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) return [];
+  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function (h) { return String(h).trim(); });
+}
+
+/** The heading for a key: yours if the form declares it, else the key made readable. */
+function heading_(key) {
+  for (var i = 0; i < COLUMNS.length; i++) {
+    if (COLUMNS[i][0] === key) return COLUMNS[i][1];
+  }
+  return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+}
+
+/** Known columns first, in your form's order; anything unrecognised after them. */
+function orderedKeys_(row) {
+  var keys = [], seen = {};
+  for (var i = 0; i < COLUMNS.length; i++) {
+    var key = COLUMNS[i][0];
+    if (Object.prototype.hasOwnProperty.call(row, key)) { keys.push(key); seen[key] = true; }
+  }
+  for (var other in row) {
+    if (Object.prototype.hasOwnProperty.call(row, other) && !seen[other]) keys.push(other);
+  }
+  return keys;
+}
+
+/**
+ * Append one submission, every value under its own heading.
+ *
+ * A fresh tab is laid out with your whole form up front, so the columns match the
+ * dashboard even when the first submission leaves optional fields blank. After
+ * that row 1 is the authority: an unknown key adds a column on the right and
+ * existing columns never move.
+ */
+function writeRow_(sheet, row) {
+  var headers = readHeaders_(sheet);
+  if (headers.length === 0) {
+    for (var i = 0; i < COLUMNS.length; i++) headers.push(COLUMNS[i][1]);
+  }
+  var keys = orderedKeys_(row);
+  for (var j = 0; j < keys.length; j++) {
+    if (headers.indexOf(heading_(keys[j])) === -1) headers.push(heading_(keys[j]));
+  }
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+  sheet.setFrozenRows(1);
+
+  var out = [];
+  for (var c = 0; c < headers.length; c++) out.push('');
+  for (var k = 0; k < keys.length; k++) {
+    out[headers.indexOf(heading_(keys[k]))] = row[keys[k]];
+  }
+  sheet.appendRow(out);
+}
+
+/** Skip a request id already in the sheet. Recent rows only - this stays fast. */
+function isDuplicate_(sheet, requestId) {
+  if (!requestId) return false;
+  var headers = readHeaders_(sheet);
+  var col = headers.indexOf(heading_('idempotency_key')) + 1;
+  if (col === 0 || sheet.getLastRow() < 2) return false;
+  var first = Math.max(2, sheet.getLastRow() - 199);
+  var seen = sheet.getRange(first, col, sheet.getLastRow() - first + 1, 1).getValues();
+  for (var i = 0; i < seen.length; i++) {
+    if (String(seen[i][0]) === String(requestId)) return true;
+  }
+  return false;
+}
+
+function ok_() {
+  return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+    .setMimeType(ContentService.MimeType.JSON);
 }`;
+}
 
 // Mirrors packs/overrides.ALLOWED_FIELD_TYPES (the server is the source of truth;
 // this is the friendly UI label for each).
@@ -103,6 +272,9 @@ const SampleFormEditor = ({ fields, onChange, sinkUrl, onSinkUrlChange, sinkSecr
   const [result, setResult] = useState<SinkStatus>(null);
   const [showTemplate, setShowTemplate] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Regenerated as the owner edits, so the script they copy always carries the
+  // columns they are looking at.
+  const appsScript = useMemo(() => buildAppsScript(fields), [fields]);
   const status = result ?? sinkStatus ?? null;
 
   const sendTestRow = async () => {
@@ -122,7 +294,7 @@ const SampleFormEditor = ({ fields, onChange, sinkUrl, onSinkUrlChange, sinkSecr
 
   const copyTemplate = async () => {
     try {
-      await navigator.clipboard.writeText(APPS_SCRIPT_TEMPLATE);
+      await navigator.clipboard.writeText(appsScript);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch { /* clipboard unavailable — no-op */ }
@@ -315,18 +487,18 @@ const SampleFormEditor = ({ fields, onChange, sinkUrl, onSinkUrlChange, sinkSecr
             className="inline-flex items-center gap-1 text-[11.5px] font-google font-medium text-blue-600 dark:text-blue-400 hover:underline"
           >
             <span className="material-symbols-outlined text-[14px]">{showTemplate ? 'expand_less' : 'code'}</span>
-            {showTemplate ? 'Hide' : 'Show'} Google Apps Script template
+            {showTemplate ? 'Hide' : 'Show'} Google Apps Script for these columns
           </button>
           {showTemplate && (
             <div className="mt-2 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
               <div className="flex items-center justify-between px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-[11px] font-google text-slate-500 dark:text-slate-400">
-                <span>Extensions → Apps Script → paste → Deploy as Web app (Anyone)</span>
+                <span>Replace everything in Code.gs → Deploy as Web app (Execute as Me, access Anyone). Your sheet gets a “Sample requests” tab with these columns.</span>
                 <button type="button" onClick={copyTemplate} className="inline-flex items-center gap-1 font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white">
                   <span className="material-symbols-outlined text-[13px]">{copied ? 'check' : 'content_copy'}</span>
                   {copied ? 'Copied' : 'Copy'}
                 </button>
               </div>
-              <pre className="px-3 py-2 text-[11px] leading-relaxed overflow-x-auto bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-mono">{APPS_SCRIPT_TEMPLATE}</pre>
+              <pre className="px-3 py-2 text-[11px] leading-relaxed overflow-x-auto bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-mono">{appsScript}</pre>
             </div>
           )}
         </div>
