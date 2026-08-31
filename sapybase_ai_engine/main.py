@@ -12999,7 +12999,7 @@ async def clerk_webhook(
             # row vanishes so the subquery can still resolve company_id.
             cursor.execute(
                 "DELETE FROM agent_sessions WHERE company_id IN "
-                "(SELECT id FROM companies WHERE user_id = (SELECT id FROM users WHERE clerk_id = %s))",
+                "(SELECT id::text FROM companies WHERE user_id = (SELECT id FROM users WHERE clerk_id = %s))",
                 (clerk_id,),
             )
             cursor.execute("DELETE FROM users WHERE clerk_id = %s", (clerk_id,))
