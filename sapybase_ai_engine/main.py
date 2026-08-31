@@ -5932,7 +5932,7 @@ def list_quote_requests(
                    s.lead_profile -> 'qualification'
             FROM quote_requests q
             LEFT JOIN agent_sessions s
-                   ON s.session_id = q.session_id AND s.company_id = q.company_id
+                   ON s.session_id = q.session_id AND s.company_id = q.company_id::text
             WHERE q.company_id = %s {status_clause}
             ORDER BY q.created_at DESC
             LIMIT %s
@@ -6072,7 +6072,7 @@ def list_agent_requests(
                    s.lead_profile -> 'qualification'
             FROM agent_requests a
             LEFT JOIN agent_sessions s
-                   ON s.session_id = a.session_id AND s.company_id = a.company_id
+                   ON s.session_id = a.session_id AND s.company_id = a.company_id::text
             WHERE {' AND '.join(clauses)}
             ORDER BY a.created_at DESC
             LIMIT %s
