@@ -4446,7 +4446,8 @@ async def _fire_sheet_sink(url: str, secret: str, payload: dict):
 
     SSRF guard (Phase 2.3): the URL is owner-configured and fetched server-side, so
     we block hosts that resolve to private/internal ranges and disable redirects so
-    a public host can't 3xx into an internal one.
+    a public host can't 3xx into an internal one. A 3xx is therefore read from the
+    status line, never followed.
 
     Returns a ``(ok, detail)`` tuple so a synchronous caller (the Phase 3.4 "Send
     test row" endpoint) can report the outcome; background callers ignore it."""
@@ -4470,6 +4471,14 @@ async def _fire_sheet_sink(url: str, secret: str, payload: dict):
                 resp = await client.post(url, content=body, headers=headers)
             if resp.is_success:
                 return (True, f"HTTP {resp.status_code}")
+            # A Google Apps Script web app answers a SUCCESSFUL doPost with a 302 to
+            # script.googleusercontent.com carrying the body — the row is appended
+            # before it redirects. Reading that as a failure both mislabelled a
+            # working sink and made the retry below append a SECOND row. 307/308 are
+            # excluded: they ask for the body to be re-sent to a new location, which
+            # we deliberately never follow.
+            if resp.status_code in (301, 302, 303):
+                return (True, f"HTTP {resp.status_code} (redirect)")
             detail = f"HTTP {resp.status_code}"
             logger.warning("SAMPLE SINK attempt %s non-2xx: %s", attempt, resp.status_code)
         except Exception as exc:
