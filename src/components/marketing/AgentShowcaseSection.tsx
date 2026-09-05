@@ -13,7 +13,7 @@ import MeshBackdrop from './showcase/MeshBackdrop';
 // geometry and swaps in near-black at a weight that still separates the frame
 // from the surface it sits on.
 const SHOWCASE_ART_FRAME =
-  'relative w-full aspect-[723/542] overflow-hidden rounded-[18px] shadow-[0_18px_50px_-12px_rgba(15,23,42,0.28)] dark:shadow-[0_18px_50px_-12px_rgba(0,0,0,0.75)]';
+  'relative w-full aspect-[723/542] overflow-hidden rounded-[18px]';
 
 export default function AgentShowcaseSection() {
   return (
