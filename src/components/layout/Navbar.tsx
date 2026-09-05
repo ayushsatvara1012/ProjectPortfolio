@@ -302,7 +302,7 @@ export default function Navbar() {
         {/* Glass surface with rounded bottom corners on mobile. */}
         <div
           aria-hidden
-          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-0 right-0 bottom-0 pointer-events-none backdrop-blur-xl saturate-150 rounded-2xl lg:rounded-[27px] border-none shadow-sm transition-colors duration-500 bg-white/80 dark:bg-black/50 ${mounted ? 'nav-shell__layer--animated' : ''
+          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-0 right-0 bottom-0 pointer-events-none backdrop-blur-xl saturate-150 rounded-2xl lg:rounded-[27px] border-none shadow-sm transition-colors duration-500 bg-transparent dark:bg-transparent ${mounted ? 'nav-shell__layer--animated' : ''
             } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
         />
 
@@ -378,8 +378,8 @@ export default function Navbar() {
                           aria-haspopup="true"
                           aria-controls={`nav-dropdown-${key}`}
                           className={`text-base xl:text-lg font-newsreader font-normal antialiased transition-all duration-200 flex items-center justify-center gap-1.5 group cursor-pointer px-6 xl:px-7 min-h-[56px] h-[56px] pt-[0.2em] select-none ${itemRadius} ${isActive
-                            ? 'bg-slate-900/15 text-slate-950 dark:bg-white/15 dark:text-white shadow-sm'
-                            : 'bg-slate-900/[0.04] text-slate-900 hover:text-slate-950 hover:bg-slate-900/[0.08] dark:bg-white/[0.05] dark:text-slate-100 dark:hover:text-white dark:hover:bg-white/10'
+                            ? 'bg-white/30 text-slate-950 dark:bg-white/15 dark:text-white shadow-sm'
+                            : 'bg-white/15 text-slate-900 shadow-sm hover:text-slate-950 hover:bg-white/25 dark:bg-white/10 dark:text-slate-100 dark:hover:text-white dark:hover:bg-white/15'
                             }`}
                         >
                           <span>{link.name}</span>
@@ -476,7 +476,7 @@ export default function Navbar() {
                     <Link
                       href={link.href}
                       onClick={(e) => handleLinkClick(e, link.href)}
-                      className={`text-base xl:text-lg font-newsreader font-normal antialiased transition-all duration-200 px-6 xl:px-7 min-h-[56px] h-[56px] pt-[0.2em] cursor-pointer select-none flex items-center justify-center ${itemRadius} bg-slate-900/[0.04] text-slate-900 hover:text-slate-950 hover:bg-slate-900/[0.08] dark:bg-white/[0.05] dark:text-slate-100 dark:hover:text-white dark:hover:bg-white/10`}
+                      className={`text-base xl:text-lg font-newsreader font-normal antialiased transition-all duration-200 px-6 xl:px-7 min-h-[56px] h-[56px] pt-[0.2em] cursor-pointer select-none flex items-center justify-center ${itemRadius} bg-white/15 text-slate-900 shadow-sm hover:text-slate-950 hover:bg-white/25 dark:bg-white/10 dark:text-slate-100 dark:hover:text-white dark:hover:bg-white/15`}
                     >
                       <span>{link.name}</span>
                     </Link>
@@ -491,7 +491,7 @@ export default function Navbar() {
             <Show when="signed-out">
               <div className="h-full flex items-center px-1 xl:px-4 transition-colors duration-500">
                 <SignInButton mode="redirect">
-                  <button className="text-base xl:text-lg font-newsreader font-normal transition-all duration-200 px-6 xl:px-7 min-h-[56px] h-[56px] pt-[0.2em] cursor-pointer rounded-l-[28px] rounded-r-[20px] select-none flex items-center justify-center bg-slate-900/[0.04] text-slate-900 hover:text-slate-950 hover:bg-slate-900/[0.08] dark:bg-white/[0.05] dark:text-slate-100 dark:hover:text-white dark:hover:bg-white/10">
+                  <button className="text-base xl:text-lg font-newsreader font-normal transition-all duration-200 px-6 xl:px-7 min-h-[56px] h-[56px] pt-[0.2em] cursor-pointer rounded-l-[28px] rounded-r-[20px] select-none flex items-center justify-center bg-white/15 text-slate-900 shadow-sm hover:text-slate-950 hover:bg-white/25 dark:bg-white/10 dark:text-slate-100 dark:hover:text-white dark:hover:bg-white/15">
                     <span>Login</span>
                   </button>
                 </SignInButton>
