@@ -11,7 +11,7 @@ export default function CoaCardArt() {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-      className="font-google absolute inset-0 h-full w-full p-2"
+      className="font-google absolute inset-0 h-full w-full"
     ><path className={ART.panel} fill="#fff" fillOpacity=".7" d="M18 0h359a18 18 0 0 1 18 18v371a18 18 0 0 1-18 18H18a18 18 0 0 1-18-18V18a18 18 0 0 1 18-18Z"/><text xmlSpace="preserve" className={ART.textMuted} fill="#5a5f70" fontSize="12" fontWeight="500" letterSpacing="0em" style={{ whiteSpace: 'pre' }}><tspan x="44" y="220.4">ABC-2201 L045B
 </tspan><tspan x="44" y="237.4">B23.0456 7X100RG
 </tspan><tspan x="44" y="254.4">PRD450 BATCH19K</tspan></text><text xmlSpace="preserve" className={ART.textMuted} fill="#8087a0" fontSize="12" fontWeight="500" letterSpacing="0em" style={{ whiteSpace: 'pre' }}><tspan x="26" y="118.4">Enter your product code and batch number, exactly as </tspan><tspan x="26" y="135.4">printed on your drum, label or invoice.

@@ -69,13 +69,13 @@ const RAIL_H = 1.16;
 
 // What is left of the viewport once the text block and the arc's overhang are
 // paid for, converted back into a card width.
-const CARD_WIDTH = `min(clamp(260px, 44vw, 720px), calc((100vh - ${TEXT_BLOCK_H}) / ${CARD_ASPECT * RAIL_H}))`;
+const CARD_WIDTH = `min(clamp(240px, 39vw, 640px), calc((100vh - ${TEXT_BLOCK_H}) / ${CARD_ASPECT * RAIL_H}))`;
 
 // Below lg the cards stack full-bleed, so each one is the container width minus
 // the section padding (px-6 below sm, sm:px-8 above). At lg and up the card is
 // the rail's --cw, which tops out at 44vw.
 const CARD_SIZES =
-  '(min-width: 1024px) 44vw, (min-width: 640px) calc(100vw - 4rem), calc(100vw - 3rem)';
+  '(min-width: 1024px) 39vw, (min-width: 640px) calc(100vw - 4rem), calc(100vw - 3rem)';
 
 const CARD_SHELL = 'w-full min-w-0 overflow-hidden flex flex-col';
 
@@ -83,11 +83,13 @@ const CARD_SHELL = 'w-full min-w-0 overflow-hidden flex flex-col';
 // bitmap because it is pure smooth colour; the UI is vector so its text and
 // hairlines stay sharp at any resolution. unoptimized keeps Next from
 // re-encoding an already-minimal gradient.
-// 18px matches the r=18 the artwork draws its own panel with. Keeping the CSS
-// clip at or above that radius stops a sliver of bare gradient showing outside
-// the panel arc at the corners.
-const CARD_ART_FRAME =
-  'relative w-full aspect-[395/407] overflow-hidden rounded-[18px]';
+// The artwork's panel is drawn with r=18 in a 395x407 viewBox and scales with
+// the card, so a fixed pixel radius here would drift apart from it at every
+// size. Percentages resolve against the box's own width and height, which
+// reproduces that ratio exactly and keeps the corners circular.
+const CARD_RADIUS = `${(18 / 395) * 100}% / ${(18 / 407) * 100}%`;
+
+const CARD_ART_FRAME = 'relative w-full aspect-[395/407] overflow-hidden';
 
 // Promoting a card costs a compositor layer, and at a 720px card that is several
 // megabytes each. The deck only ever moves in response to a click, so the layers
@@ -179,15 +181,16 @@ export default function VerticalsSection() {
           return (
             <article
               key={card.id}
-              className={`${CARD_SHELL} ${CARD_PROMOTION} lg:absolute lg:left-0 lg:top-0 lg:w-[var(--cw)] lg:rounded-[18px] lg:shadow-[0_18px_50px_-12px_rgba(15,23,42,0.28)] lg:[transform:var(--slot-transform)] lg:[z-index:var(--slot-z)] lg:[backface-visibility:hidden] lg:transition-transform lg:duration-[900ms] lg:ease-[cubic-bezier(0.45,0,0.25,1)] lg:motion-reduce:transition-none`}
+              className={`${CARD_SHELL} ${CARD_PROMOTION} lg:absolute lg:left-0 lg:top-0 lg:w-[var(--cw)] lg:shadow-[0_18px_50px_-12px_rgba(15,23,42,0.28)] lg:[transform:var(--slot-transform)] lg:[z-index:var(--slot-z)] lg:[backface-visibility:hidden] lg:transition-transform lg:duration-[900ms] lg:ease-[cubic-bezier(0.45,0,0.25,1)] lg:motion-reduce:transition-none`}
               style={{
+                borderRadius: CARD_RADIUS,
                 ['--slot-transform' as string]: slotTransform(slot),
                 ['--slot-z' as string]: String(
                   isCrossing ? CROSSING_Z : CENTRE_Z - Math.abs(slot) * 10,
                 ),
               }}
             >
-              <div className={CARD_ART_FRAME}>
+              <div className={CARD_ART_FRAME} style={{ borderRadius: CARD_RADIUS }}>
                 <NextImage
                   src={card.bg}
                   alt=""
@@ -208,7 +211,8 @@ export default function VerticalsSection() {
                   type="button"
                   onClick={() => goTo(index)}
                   aria-current={isCentred}
-                  className={`hidden lg:block absolute inset-0 rounded-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 ${
+                  style={{ borderRadius: CARD_RADIUS }}
+                  className={`hidden lg:block absolute inset-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 ${
                     isCentred ? 'cursor-default' : 'cursor-pointer'
                   }`}
                 >

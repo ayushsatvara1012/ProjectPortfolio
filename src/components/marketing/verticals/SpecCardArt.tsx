@@ -11,7 +11,7 @@ export default function SpecCardArt() {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-      className="font-google absolute inset-0 h-full w-full p-2"
+      className="font-google absolute inset-0 h-full w-full"
     ><path className={ART.panel} fill="#fff" fillOpacity=".7" d="M18 0h359a18 18 0 0 1 18 18v371a18 18 0 0 1-18 18H18a18 18 0 0 1-18-18V18a18 18 0 0 1 18-18Z"/><rect width="341" height="35" x="24.5" y="53.5" className={ART.field} fill="#fff" stroke="#cdcdcd" rx="16.5"/><text xmlSpace="preserve" className={ART.textPrimary} fill="#000" fontSize="13" fontWeight="500" letterSpacing="0em" style={{ whiteSpace: 'pre' }}><tspan x="69" y="76.3">Acet</tspan></text><text xmlSpace="preserve" className={ART.textPrimary} fill="#000" fontSize="13" fontWeight="500" letterSpacing="0em" style={{ whiteSpace: 'pre' }}><tspan x="31" y="118.8">Acetic acid · Food Grade · Spec
 </tspan><tspan x="31" y="147.8">Acetic acid · USP · Ph.Eur · IP · BP · Spec · MC7
 </tspan><tspan x="31" y="176.8">Acetic acid · USP · Ph.Eur · IP · BP · Spec · MC7 · Parental
