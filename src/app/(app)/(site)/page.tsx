@@ -7,7 +7,6 @@ import HeroSection from '@/src/components/marketing/HeroSection';
 import ProofSection from '@/src/components/marketing/hero/ProofSection';
 import AgentShowcaseSection from '@/src/components/marketing/AgentShowcaseSection';
 // import SocialProofBar from '@/src/components/marketing/SocialProofBar'; // hidden for now — component kept in src/components/marketing/SocialProofBar.tsx
-import ChatbotShowcase from '@/src/components/marketing/home/ChatbotShowcase';
 import FeatureGrid from '@/src/components/marketing/home/FeatureGrid';
 // import WhatWeSolve from '@/src/components/marketing/WhatWeSolve'; // hidden for now — component kept in src/components/marketing/WhatWeSolve.tsx
 
@@ -134,7 +133,6 @@ export default function HomePage() {
           <ProofSection />
           <AgentShowcaseSection />
           {/* <SocialProofBar /> */}
-          <ChatbotShowcase />
           <FeatureGrid />
           {/* <WhatWeSolve /> */}
           {/* <ScrollTravelSection /> */}

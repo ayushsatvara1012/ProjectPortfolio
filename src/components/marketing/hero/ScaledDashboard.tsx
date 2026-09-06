@@ -19,6 +19,12 @@ import DashboardMock, { MOCK_WIDTH } from './DashboardMock';
 
 const MAX_RENDER_WIDTH = 1600;
 
+/* The mock has no natural ending, so it dissolves into the hero ground instead
+   of stopping at a hard edge. Masked rather than overlaid with a gradient, so
+   it works over both the light and dark backdrop. */
+const BOTTOM_FADE =
+  'linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)';
+
 export default function ScaledDashboard() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -62,7 +68,11 @@ export default function ScaledDashboard() {
     <div
       ref={wrapRef}
       className="mx-auto w-full max-w-[1600px] h-[124px] min-[360px]:h-[140px] min-[400px]:h-[155px] min-[480px]:h-[190px] sm:h-[255px] md:h-[310px] lg:h-[420px] xl:h-[530px] min-[1440px]:h-[600px] min-[1648px]:h-[690px]"
-      style={fit ? { height: fit.height } : undefined}
+      style={{
+        maskImage: BOTTOM_FADE,
+        WebkitMaskImage: BOTTOM_FADE,
+        ...(fit ? { height: fit.height } : {}),
+      }}
     >
       <div
         ref={innerRef}

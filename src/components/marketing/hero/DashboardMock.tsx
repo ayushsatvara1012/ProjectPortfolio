@@ -75,7 +75,7 @@ function BrowserBar() {
         <i className="size-2 rounded-full bg-slate-300 dark:bg-slate-700" />
         <i className="size-2 rounded-full bg-slate-300 dark:bg-slate-700" />
       </span>
-      <span className="mx-auto rounded-md bg-white px-3 py-1 font-google text-[11px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+      <span className="mx-auto rounded-md bg-white px-3 py-1 font-google text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
         app.sapybase.com/dashboard
       </span>
     </div>
@@ -88,7 +88,7 @@ function IconRail() {
       {RAIL_ICONS.map((icon, i) => (
         <span
           key={icon}
-          className={`material-symbols-outlined flex size-7 items-center justify-center rounded-lg text-[15px] ${
+          className={`material-symbols-outlined flex size-7 items-center justify-center rounded-lg text-[14px] ${
             i === 2
               ? 'bg-slate-900/[0.06] text-slate-900 dark:bg-white/10 dark:text-white'
               : 'text-slate-400 dark:text-slate-600'
@@ -104,15 +104,15 @@ function IconRail() {
 function AppHeader() {
   return (
     <div className="shrink-0 border-b border-slate-900/[0.07] bg-white px-5 dark:border-white/10 dark:bg-slate-950">
-      <div className="flex items-center gap-2 py-2.5 font-google text-[11px] text-slate-400 dark:text-slate-500">
+      <div className="flex items-center gap-2 py-2.5 font-google text-[10px] text-slate-400 dark:text-slate-500">
         <span className="text-slate-500 dark:text-slate-400">Workspace</span>
-        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+        <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
           Growth
         </span>
-        <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+        <span className="material-symbols-outlined text-[13px]">chevron_right</span>
         <span className="font-medium text-slate-900 dark:text-slate-100">Insights Dashboard</span>
-        <span className="ml-auto flex items-center gap-1.5 rounded-lg border border-slate-900/10 px-2 py-1 text-[10px] font-medium text-slate-700 dark:border-white/10 dark:text-slate-200">
-          <span className="material-symbols-outlined text-[13px]">smart_toy</span>
+        <span className="ml-auto flex items-center gap-1.5 rounded-lg border border-slate-900/10 px-2 py-1 text-[9px] font-medium text-slate-700 dark:border-white/10 dark:text-slate-200">
+          <span className="material-symbols-outlined text-[12px]">smart_toy</span>
           Vaayu
         </span>
       </div>
@@ -121,13 +121,13 @@ function AppHeader() {
         {TABS.map((tab, i) => (
           <span
             key={tab.label}
-            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2 font-google text-xs ${
+            className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 pb-2 font-google text-[10px] ${
               i === 1
                 ? 'border-[#004DE8] font-medium text-[#004DE8] dark:border-blue-400 dark:text-blue-400'
                 : 'border-transparent text-slate-500 dark:text-slate-400'
             }`}
           >
-            <span className="material-symbols-outlined text-[14px]">{tab.icon}</span>
+            <span className="material-symbols-outlined text-[13px]">{tab.icon}</span>
             {tab.label}
           </span>
         ))}
@@ -140,15 +140,15 @@ function ConversationsPanel() {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-900/[0.07] bg-white dark:border-white/10 dark:bg-slate-950">
       <div className="flex shrink-0 items-center gap-2 border-b border-slate-900/[0.07] px-4 py-2.5 dark:border-white/10">
-        <span className="material-symbols-outlined text-[15px] text-slate-400">forum</span>
-        <span className="font-google text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <span className="material-symbols-outlined text-[14px] text-slate-400">forum</span>
+        <span className="font-google text-[12px] font-semibold text-slate-900 dark:text-slate-100">
           257 conversations
         </span>
         <span className="ml-auto flex gap-1.5">
-          <span className="rounded-full bg-slate-900 px-2.5 py-1 font-google text-[10px] font-medium text-white dark:bg-white dark:text-slate-900">
+          <span className="rounded-full bg-slate-900 px-2.5 py-1 font-google text-[9px] font-medium text-white dark:bg-white dark:text-slate-900">
             All
           </span>
-          <span className="flex items-center gap-1 rounded-full border border-slate-900/10 px-2.5 py-1 font-google text-[10px] text-slate-600 dark:border-white/10 dark:text-slate-300">
+          <span className="flex items-center gap-1 rounded-full border border-slate-900/10 px-2.5 py-1 font-google text-[9px] text-slate-600 dark:border-white/10 dark:text-slate-300">
             <i className="size-1.5 rounded-full bg-amber-500" />
             Has gaps
           </span>
@@ -171,11 +171,11 @@ function ConversationRow({ title, meta, gaps }: Conversation) {
         gaps ? 'border-l-2 border-l-amber-400' : 'border-l-2 border-l-transparent'
       }`}
     >
-      <p className="truncate font-google text-[13px] text-slate-800 dark:text-slate-200">{title}</p>
-      <p className="mt-1 flex items-center gap-2 font-google text-[10px] text-slate-400 dark:text-slate-500">
+      <p className="truncate font-google text-[12px] text-slate-800 dark:text-slate-200">{title}</p>
+      <p className="mt-1 flex items-center gap-2 font-google text-[9px] text-slate-400 dark:text-slate-500">
         <span className="truncate">{meta}</span>
         {gaps && (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[8px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
             <i className="size-1 rounded-full bg-amber-500" />
             Has gaps
           </span>
@@ -190,10 +190,10 @@ function ConversationRow({ title, meta, gaps }: Conversation) {
 function ExpandedThread() {
   return (
     <div className="min-h-0 border-l-2 border-l-amber-400 px-4 py-3">
-      <p className="font-google text-[13px] text-slate-800 dark:text-slate-200">
+      <p className="font-google text-[12px] text-slate-800 dark:text-slate-200">
         Pricing for a bulk order
       </p>
-      <p className="mt-1 font-google text-[10px] text-slate-400 dark:text-slate-500">
+      <p className="mt-1 font-google text-[9px] text-slate-400 dark:text-slate-500">
         Aug 29 · 12:16 PM   ·   17 msgs
       </p>
 
@@ -203,8 +203,8 @@ function ExpandedThread() {
           text="I don't have that on file. Let me get someone from the team to pick this up with you."
           unanswered
         />
-        <span className="flex items-center gap-1.5 font-google text-[11px] font-medium text-[#004DE8] dark:text-blue-400">
-          <span className="material-symbols-outlined text-[14px]">school</span>
+        <span className="flex items-center gap-1.5 font-google text-[10px] font-medium text-[#004DE8] dark:text-blue-400">
+          <span className="material-symbols-outlined text-[13px]">school</span>
           Teach the assistant
         </span>
       </div>
@@ -215,12 +215,12 @@ function ExpandedThread() {
 function Turn({ role, time, text }: { role: string; time: string; text: string }) {
   return (
     <div>
-      <p className="flex items-center gap-1.5 font-google text-[9px] font-semibold tracking-wider text-slate-400 dark:text-slate-500">
-        <span className="material-symbols-outlined text-[12px]">person</span>
+      <p className="flex items-center gap-1.5 font-google text-[8px] font-semibold tracking-wider text-slate-400 dark:text-slate-500">
+        <span className="material-symbols-outlined text-[11px]">person</span>
         {role}
         <span className="ml-auto font-normal tracking-normal">{time}</span>
       </p>
-      <p className="mt-1 font-google text-[12px] text-slate-800 dark:text-slate-200">{text}</p>
+      <p className="mt-1 font-google text-[11px] text-slate-800 dark:text-slate-200">{text}</p>
     </div>
   );
 }
@@ -228,15 +228,15 @@ function Turn({ role, time, text }: { role: string; time: string; text: string }
 function Answer({ text, unanswered }: { text: string; unanswered?: boolean }) {
   return (
     <div className="border-l-2 border-amber-400 pl-2.5">
-      <p className="flex items-center gap-1.5 font-google text-[9px] font-semibold tracking-wider text-slate-400 dark:text-slate-500">
+      <p className="flex items-center gap-1.5 font-google text-[8px] font-semibold tracking-wider text-slate-400 dark:text-slate-500">
         ASSISTANT
         {unanswered && (
-          <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[9px] tracking-normal text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+          <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-[8px] tracking-normal text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
             Unanswered
           </span>
         )}
       </p>
-      <p className="mt-1 font-google text-[12px] text-slate-600 dark:text-slate-300">{text}</p>
+      <p className="mt-1 font-google text-[11px] text-slate-600 dark:text-slate-300">{text}</p>
     </div>
   );
 }
@@ -245,15 +245,15 @@ function GapsPanel() {
   return (
     <div className="flex w-[360px] shrink-0 flex-col overflow-hidden rounded-lg border border-slate-900/[0.07] bg-white dark:border-white/10 dark:bg-slate-950">
       <div className="flex shrink-0 items-center gap-2 border-b border-slate-900/[0.07] px-4 py-2.5 dark:border-white/10">
-        <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
-        <span className="font-google text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <span className="material-symbols-outlined text-[14px] text-amber-500">build</span>
+        <span className="font-google text-[12px] font-semibold text-slate-900 dark:text-slate-100">
           Gaps to teach
         </span>
         <span className="ml-auto flex gap-1.5">
           {['10', '14'].map((n) => (
             <span
               key={n}
-              className="flex items-center gap-1 rounded-full border border-amber-300/60 px-2 py-0.5 font-google text-[10px] text-amber-700 dark:border-amber-500/30 dark:text-amber-400"
+              className="flex items-center gap-1 rounded-full border border-amber-300/60 px-2 py-0.5 font-google text-[9px] text-amber-700 dark:border-amber-500/30 dark:text-amber-400"
             >
               <i className="size-1 rounded-full bg-amber-500" />
               {n}
@@ -267,11 +267,11 @@ function GapsPanel() {
           key={g.q}
           className="shrink-0 border-b border-slate-900/[0.06] px-4 py-2.5 dark:border-white/[0.07]"
         >
-          <p className="flex gap-2 font-google text-[12px] leading-snug text-slate-800 dark:text-slate-200">
+          <p className="flex gap-2 font-google text-[11px] leading-snug text-slate-800 dark:text-slate-200">
             <i className="mt-1.5 size-1 shrink-0 rounded-full bg-amber-500" />
             {g.q}
           </p>
-          <p className="mt-1 pl-3 font-google text-[10px] text-slate-400 dark:text-slate-500">
+          <p className="mt-1 pl-3 font-google text-[9px] text-slate-400 dark:text-slate-500">
             <span className="text-amber-600 dark:text-amber-500">Unanswered</span>
             {'   '}Asked {g.asked}
             {'   '}

@@ -302,7 +302,7 @@ export default function Navbar() {
         {/* Glass surface with rounded bottom corners on mobile. */}
         <div
           aria-hidden
-          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-0 right-0 bottom-0 pointer-events-none backdrop-blur-xl saturate-150 rounded-2xl lg:rounded-[27px] border-none shadow-sm transition-colors duration-500 bg-transparent dark:bg-transparent ${mounted ? 'nav-shell__layer--animated' : ''
+          className={`nav-shell__layer nav-shell__layer--inner absolute top-0 left-0 right-0 bottom-0 pointer-events-none backdrop-blur-xl rounded-2xl lg:rounded-[27px] border-none transition-colors duration-500 bg-transparent dark:bg-transparent ${mounted ? 'nav-shell__layer--animated' : ''
             } ${collapsed ? 'nav-shell__layer--collapsed' : ''}`}
         />
 
